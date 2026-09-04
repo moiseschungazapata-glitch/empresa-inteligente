@@ -13,16 +13,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Paso 1: Validar credenciales y enviar OTP sin romper la sesión de golpe
+  // Paso 1: Validar credenciales y enviar OTP
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return; // Evita doble clic (Error 429)
+    if (loading) return;
     
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Verificamos que el correo y contraseña sean correctos
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -32,22 +31,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error("Correo o contraseña incorrectos.");
       }
 
-      // 2. Cerramos la sesión temporalmente de forma limpia antes de enviar el OTP
       await supabase.auth.signOut();
 
-      // 3. Enviamos el código OTP de 8 dígitos a su correo
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          shouldCreateUser: false,
-        },
+        options: { shouldCreateUser: false },
       });
 
       if (otpError) {
         throw new Error(otpError.message || "Error al enviar el código OTP.");
       }
 
-      // Pasamos limpiamente a la pantalla del código OTP
       setStep("otp");
     } catch (err: any) {
       setError(err.message || "Ocurrió un error al procesar la solicitud.");
@@ -88,77 +82,109 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div style={{
       minHeight: "100vh",
-      backgroundColor: "#070b19",
+      backgroundColor: "#05070f",
+      backgroundImage: "radial-gradient(circle at 50% 0%, #0f172a 0%, #05070f 75%)",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      fontFamily: "Inter, sans-serif",
+      fontFamily: "Inter, system-ui, -apple-system, sans-serif",
       color: "#f8fafc",
-      padding: "20px"
+      padding: "24px"
     }}>
       <div style={{
         width: "100%",
-        maxWidth: "420px",
-        backgroundColor: "#0f172a",
-        border: "1px solid #1e293b",
-        borderRadius: "16px",
-        padding: "40px",
-        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)"
+        maxWidth: "480px", // Más ancho y cómodo
+        backgroundColor: "#0b0f19",
+        border: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRadius: "20px",
+        padding: "48px 40px",
+        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7)"
       }}>
         
-        {/* Cabecera corporativa */}
-        <div style={{ textAlign: "center", marginBottom: "25px" }}>
+        {/* Cabecera Corporativa */}
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{
-            width: "48px",
-            height: "48px",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
-            borderRadius: "12px",
+            width: "56px",
+            height: "56px",
+            background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            borderRadius: "14px",
             display: "inline-flex",
             justifyContent: "center",
             alignItems: "center",
-            fontSize: "22px",
-            marginBottom: "15px"
+            fontSize: "24px",
+            marginBottom: "16px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)"
           }}>
             🛡️
           </div>
-          <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 5px 0" }}>
-            Empresa <span style={{ color: "#0ea5e9" }}>Inteligente</span>
-          </h2>
-          <p style={{ fontSize: "11px", color: "#64748b", margin: 0, letterSpacing: "1px" }}>
-            SISTEMA DE GESTIÓN EMPRESARIAL
+          <h1 style={{ fontSize: "22px", fontWeight: "700", margin: "0 0 6px 0", letterSpacing: "-0.025em" }}>
+            Empresa <span style={{ color: "#38bdf8" }}>Inteligente</span>
+          </h1>
+          <p style={{ fontSize: "12px", color: "#64748b", margin: 0, letterSpacing: "1.5px", textTransform: "uppercase", fontWeight: "600" }}>
+            Plataforma de Gestión Segura
           </p>
         </div>
 
-        {/* Indicador de pasos */}
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "25px", borderBottom: "1px solid #1e293b", paddingBottom: "12px" }}>
-          <span style={{ fontSize: "12px", color: step === "credentials" ? "#0ea5e9" : "#64748b", fontWeight: "600" }}>
+        {/* Indicador de pasos estilo Badge Moderno */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "8px",
+          marginBottom: "32px",
+          backgroundColor: "#020617",
+          padding: "4px",
+          borderRadius: "10px",
+          border: "1px solid rgba(255, 255, 255, 0.04)"
+        }}>
+          <div style={{
+            textAlign: "center",
+            padding: "8px",
+            borderRadius: "8px",
+            fontSize: "12px",
+            fontWeight: "600",
+            backgroundColor: step === "credentials" ? "#1e293b" : "transparent",
+            color: step === "credentials" ? "#38bdf8" : "#64748b",
+            transition: "all 0.2s ease"
+          }}>
             1. Credenciales
-          </span>
-          <span style={{ fontSize: "12px", color: step === "otp" ? "#0ea5e9" : "#64748b", fontWeight: "600" }}>
-            2. Código OTP (8 dígitos)
-          </span>
+          </div>
+          <div style={{
+            textAlign: "center",
+            padding: "8px",
+            borderRadius: "8px",
+            fontSize: "12px",
+            fontWeight: "600",
+            backgroundColor: step === "otp" ? "#1e293b" : "transparent",
+            color: step === "otp" ? "#38bdf8" : "#64748b",
+            transition: "all 0.2s ease"
+          }}>
+            2. Código OTP
+          </div>
         </div>
 
         {error && (
           <div style={{
             backgroundColor: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid #ef4444",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
             color: "#fca5a5",
-            padding: "10px 14px",
-            borderRadius: "8px",
+            padding: "12px 16px",
+            borderRadius: "10px",
             fontSize: "13px",
-            marginBottom: "20px"
+            marginBottom: "24px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
           }}>
-            {error}
+            <span>⚠️</span> {error}
           </div>
         )}
 
-        {/* Formulario Paso 1: Correo y Contraseña */}
+        {/* Formulario Paso 1 */}
         {step === "credentials" ? (
           <form onSubmit={handleCredentialsSubmit}>
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "6px", color: "#cbd5e1" }}>
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "8px", color: "#94a3b8" }}>
                 Correo electrónico
               </label>
               <input
@@ -169,34 +195,35 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 style={{
                   width: "100%",
-                  padding: "12px 16px",
+                  padding: "14px 16px",
                   backgroundColor: "#020617",
-                  border: "1px solid #334155",
-                  borderRadius: "8px",
+                  border: "1px solid #1e293b",
+                  borderRadius: "10px",
                   color: "white",
                   fontSize: "14px",
                   outline: "none",
-                  boxSizing: "border-box"
+                  boxSizing: "border-box",
+                  transition: "border-color 0.2s"
                 }}
               />
             </div>
 
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "6px", color: "#cbd5e1" }}>
+            <div style={{ marginBottom: "28px" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "8px", color: "#94a3b8" }}>
                 Contraseña
               </label>
               <input
                 type="password"
                 required
-                placeholder="••••••••"
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
                   width: "100%",
-                  padding: "12px 16px",
+                  padding: "14px 16px",
                   backgroundColor: "#020617",
-                  border: "1px solid #334155",
-                  borderRadius: "8px",
+                  border: "1px solid #1e293b",
+                  borderRadius: "10px",
                   color: "white",
                   fontSize: "14px",
                   outline: "none",
@@ -210,25 +237,27 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               disabled={loading}
               style={{
                 width: "100%",
-                padding: "13px",
-                backgroundColor: loading ? "#334155" : "#0ea5e9",
+                padding: "14px",
+                backgroundColor: loading ? "#334155" : "#0284c7",
                 color: "white",
                 border: "none",
-                borderRadius: "8px",
+                borderRadius: "10px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer"
+                cursor: loading ? "not-allowed" : "pointer",
+                boxShadow: "0 4px 12px rgba(2, 132, 199, 0.3)",
+                transition: "background-color 0.2s"
               }}
             >
-              {loading ? "Enviando código OTP..." : "Continuar al código OTP ➔"}
+              {loading ? "Verificando credenciales..." : "Continuar al código OTP →"}
             </button>
           </form>
         ) : (
-          /* Formulario Paso 2: Código OTP de 8 dígitos */
+          /* Formulario Paso 2 */
           <form onSubmit={handleVerifyOtp}>
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "8px", color: "#cbd5e1", textAlign: "center" }}>
-                Ingresa los 8 dígitos enviados a tu correo
+            <div style={{ marginBottom: "24px", textAlign: "center" }}>
+              <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "12px", color: "#94a3b8" }}>
+                Ingresa el código de 8 dígitos enviado a tu correo
               </label>
               <input
                 type="text"
@@ -239,14 +268,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 onChange={(e) => setToken(e.target.value)}
                 style={{
                   width: "100%",
-                  padding: "12px 16px",
+                  padding: "16px",
                   backgroundColor: "#020617",
-                  border: "1px solid #334155",
-                  borderRadius: "8px",
-                  color: "white",
-                  fontSize: "20px",
-                  letterSpacing: "4px",
+                  border: "1px solid #1e293b",
+                  borderRadius: "10px",
+                  color: "#38bdf8",
+                  fontSize: "24px",
+                  letterSpacing: "6px",
                   textAlign: "center",
+                  fontWeight: "700",
                   outline: "none",
                   boxSizing: "border-box"
                 }}
@@ -258,18 +288,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               disabled={loading}
               style={{
                 width: "100%",
-                padding: "13px",
-                backgroundColor: loading ? "#334155" : "#22c55e",
+                padding: "14px",
+                backgroundColor: loading ? "#334155" : "#16a34a",
                 color: "white",
                 border: "none",
-                borderRadius: "8px",
+                borderRadius: "10px",
                 fontWeight: "600",
                 fontSize: "14px",
                 cursor: loading ? "not-allowed" : "pointer",
-                marginBottom: "12px"
+                boxShadow: "0 4px 12px rgba(22, 163, 74, 0.3)",
+                marginBottom: "16px"
               }}
             >
-              {loading ? "Verificando..." : "Validar código y acceder"}
+              {loading ? "Validando código..." : "Validar código y acceder"}
             </button>
 
             <button
@@ -281,23 +312,26 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 border: "none",
                 color: "#64748b",
                 fontSize: "13px",
-                cursor: "pointer"
+                cursor: "pointer",
+                fontWeight: "500"
               }}
             >
-              ← Volver al inicio
+              ← Volver al inicio de sesión
             </button>
           </form>
         )}
 
+        {/* Footer corporativo */}
         <div style={{
-          marginTop: "25px",
-          paddingTop: "20px",
-          borderTop: "1px solid #1e293b",
+          marginTop: "32px",
+          paddingTop: "24px",
+          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
           textAlign: "center",
           fontSize: "11px",
-          color: "#64748b"
+          color: "#475569",
+          letterSpacing: "0.5px"
         }}>
-          🔒 Conexión encriptada E2EE • 2026 Empresa Inteligente
+          🔒 Seguridad cifrada de extremo a extremo • Empresa Inteligente 2026
         </div>
 
       </div>
