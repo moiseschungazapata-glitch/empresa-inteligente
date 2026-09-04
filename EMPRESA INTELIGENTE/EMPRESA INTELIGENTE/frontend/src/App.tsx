@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./services/supabaseClient";
+import Login from "./components/auth/Login";
 import AnalizarComentario from "./pages/AnalizarComentario";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
@@ -23,7 +24,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState("Dashboard");
-  const [isMobileOpen, setIsMobileOpen] = useState(false); // Estado para abrir/cerrar el menú en celular
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,52 +41,21 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-    });
-  };
-
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: "#070b19", color: "white" }}>
         <h2>Cargando Empresa Inteligente...</h2>
       </div>
     );
   }
 
+  // Si no hay sesión, se muestra el componente de Login profesional con OTP
   if (!session) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", background: "#f8fafc", fontFamily: "sans-serif" }}>
-        <div style={{ background: "white", padding: "3rem", borderRadius: "12px", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)", textAlign: "center" }}>
-          <h1 style={{ marginBottom: "0.5rem", color: "#1e293b" }}>Empresa Inteligente</h1>
-          <p style={{ color: "#64748b", marginBottom: "2rem" }}>Inicia sesión con tu cuenta corporativa de GitHub para continuar</p>
-          <button 
-            onClick={handleLogin}
-            style={{ 
-              backgroundColor: "#0f172a", 
-              color: "white", 
-              padding: "12px 24px", 
-              borderRadius: "8px", 
-              border: "none", 
-              fontWeight: "600", 
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              margin: "0 auto"
-            }}
-          >
-            Iniciar sesión con GitHub
-          </button>
-        </div>
-      </div>
-    );
+    return <Login onLoginSuccess={() => window.location.reload()} />;
   }
 
   return (
     <div className="app">
-      {/* Barra lateral con estado móvil */}
       <Sidebar
         activePage={activePage}
         setActivePage={setActivePage}
@@ -94,7 +64,6 @@ function App() {
       />
 
       <div className="content">
-        {/* Barra superior para celulares con botón de menú hamburguesa */}
         <div className="mobile-topbar">
           <button
             onClick={() => setIsMobileOpen(true)}
@@ -103,7 +72,7 @@ function App() {
             ☰
           </button>
           <span style={{ fontWeight: "700", color: "#1e293b", fontSize: "16px" }}>Empresa Inteligente</span>
-          <div style={{ width: "24px" }} /> {/* Espaciador simétrico */}
+          <div style={{ width: "24px" }} />
         </div>
 
         {activePage === "Dashboard" && <Dashboard />}
