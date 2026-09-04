@@ -13,35 +13,44 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Paso 1: Validar Correo y Contraseña
+  // Paso 1: Validar credenciales y enviar OTP sin romper la sesión de golpe
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Evita doble clic (Error 429)
+    
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Validamos las credenciales en Supabase Auth
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      // 1. Verificamos que el correo y contraseña sean correctos
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (authError) throw new Error("Correo o contraseña incorrectos.");
+      if (authError || !authData.user) {
+        throw new Error("Correo o contraseña incorrectos.");
+      }
 
-      // 2. Cerramos sesión temporalmente para exigir el segundo factor de seguridad (OTP)
+      // 2. Cerramos la sesión temporalmente de forma limpia antes de enviar el OTP
       await supabase.auth.signOut();
 
-      // 3. Disparamos el envío del código OTP de 8 dígitos al correo
+      // 3. Enviamos el código OTP de 8 dígitos a su correo
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
+        options: {
+          shouldCreateUser: false,
+        },
       });
 
-      if (otpError) throw otpError;
+      if (otpError) {
+        throw new Error(otpError.message || "Error al enviar el código OTP.");
+      }
 
-      // Avanzamos al paso 2 visual para introducir el código
+      // Pasamos limpiamente a la pantalla del código OTP
       setStep("otp");
     } catch (err: any) {
-      setError(err.message || "Error al validar las credenciales.");
+      setError(err.message || "Ocurrió un error al procesar la solicitud.");
     } finally {
       setLoading(false);
     }
@@ -50,17 +59,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   // Paso 2: Verificar el código OTP de 8 dígitos
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
     setError(null);
 
     try {
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token,
+        token: token.trim(),
         type: "email",
       });
 
-      if (error) throw new Error("Código OTP inválido o expirado.");
+      if (error) throw new Error("El código OTP es inválido o ha expirado.");
 
       if (onLoginSuccess) {
         onLoginSuccess();
@@ -68,7 +79,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         window.location.reload();
       }
     } catch (err: any) {
-      setError(err.message || "Código incorrecto o expirado.");
+      setError(err.message || "Código incorrecto.");
     } finally {
       setLoading(false);
     }
@@ -200,20 +211,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               style={{
                 width: "100%",
                 padding: "13px",
-                backgroundColor: "#0ea5e9",
+                backgroundColor: loading ? "#334155" : "#0ea5e9",
                 color: "white",
                 border: "none",
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer"
+                cursor: loading ? "not-allowed" : "pointer"
               }}
             >
-              {loading ? "Validando credenciales..." : "Continuar al código OTP ➔"}
+              {loading ? "Enviando código OTP..." : "Continuar al código OTP ➔"}
             </button>
           </form>
         ) : (
-          /* Formulario Paso 2: Código OTP de 8 dígitos exactos */
+          /* Formulario Paso 2: Código OTP de 8 dígitos */
           <form onSubmit={handleVerifyOtp}>
             <div style={{ marginBottom: "20px" }}>
               <label style={{ display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "8px", color: "#cbd5e1", textAlign: "center" }}>
@@ -248,13 +259,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               style={{
                 width: "100%",
                 padding: "13px",
-                backgroundColor: "#22c55e",
+                backgroundColor: loading ? "#334155" : "#22c55e",
                 color: "white",
                 border: "none",
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 marginBottom: "12px"
               }}
             >
@@ -278,7 +289,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </form>
         )}
 
-        {/* Footer */}
         <div style={{
           marginTop: "25px",
           paddingTop: "20px",
