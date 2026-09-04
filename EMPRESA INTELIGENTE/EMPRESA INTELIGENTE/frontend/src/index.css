@@ -43,6 +43,8 @@ input {
   color: white;
   padding: 25px 15px;
   overflow-y: auto;
+  transition: transform 0.3s ease-in-out;
+  z-index: 1000;
 }
 
 .logo {
@@ -369,17 +371,45 @@ form {
 }
 
 /* =========================
-   RESPONSIVE
+   RESPONSIVE (MÓVIL Y TABLET)
 ========================= */
 
-@media (max-width: 900px) {
+.mobile-topbar {
+  display: none;
+}
 
+@media (max-width: 900px) {
   .sidebar {
-    width: 220px;
+    transform: translateX(-100%);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
   }
 
   .content {
-    margin-left: 220px;
+    margin-left: 0;
+    padding: 15px;
+  }
+
+  .mobile-topbar {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: white;
+    border-bottom: 1px solid #e2e8f0;
+    margin: -30px -15px 20px -15px;
+  }
+
+  .mobile-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
   }
 
   .kpi-grid {
