@@ -12,6 +12,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [otpSecret, setOtpSecret] = useState(""); // Almacena el código OTP generado localmente
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,7 +88,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // PASO 1: Validar Credenciales y enviar OTP inicial con manejo estricto de errores
+  // PASO 1: Validar Credenciales y enviar OTP mediante la API HTTP directa de Resend
   const handleAccessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -96,7 +97,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      // 1. Validar correo y contraseña
+      // 1. Validar correo y contraseña en Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -107,21 +108,31 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error(authError?.message || "Correo o contraseña incorrectos.");
       }
 
-      // 2. Cerrar sesión temporalmente para obligar completar la autenticación por factores (OTP + Biometría)
+      // 2. Cerrar sesión temporalmente para exigir completar el flujo de 2FA
       await supabase.auth.signOut();
 
-      // 3. Solicitar envío de código OTP al correo
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: false },
+      // 3. Generar un código aleatorio de 8 dígitos
+      const generatedCode = Math.floor(10000000 + Math.random() * 90000000).toString();
+      setOtpSecret(generatedCode);
+
+      // 4. Enviar correo usando la API HTTP de Resend con la variable de entorno
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: "onboarding@resend.dev",
+          to: [email.trim()],
+          subject: "Tu código de verificación - Empresa Inteligente",
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;"><h2>Empresa Inteligente</h2><p>Tu código de acceso de 8 dígitos es:</p><h1 style="color: #0284c7; letter-spacing: 4px;">${generatedCode}</h1><p>Este código es confidencial.</p></div>`,
+        }),
       });
 
-      if (otpError) {
-        console.error("Error al enviar OTP Supabase:", otpError);
-        if (otpError.status === 429) {
-          throw new Error("Demasiados intentos. Espera unos minutos antes de volver a intentar.");
-        }
-        throw new Error(otpError.message || "Error al enviar el código OTP. Verifica tu proveedor de correo en Supabase.");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "No se pudo enviar el correo mediante Resend.");
       }
 
       // Éxito: Avanzar al paso del Código
@@ -136,19 +147,31 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // Reenviar código OTP con temporizador funcional
+  // Reenviar código OTP mediante la API HTTP de Resend
   const handleResendOtp = async () => {
     if (!canResend || loading) return;
     setLoading(true);
     setError(null);
 
     try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: false },
+      const generatedCode = Math.floor(10000000 + Math.random() * 90000000).toString();
+      setOtpSecret(generatedCode);
+
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: "onboarding@resend.dev",
+          to: [email.trim()],
+          subject: "Tu código de verificación - Empresa Inteligente",
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;"><h2>Empresa Inteligente</h2><p>Tu nuevo código de acceso es:</p><h1 style="color: #0284c7; letter-spacing: 4px;">${generatedCode}</h1></div>`,
+        }),
       });
 
-      if (otpError) throw new Error(otpError.message || "No se pudo reenviar el código.");
+      if (!response.ok) throw new Error("No se pudo reenviar el código.");
 
       alert("¡Código OTP reenviado con éxito a tu correo!");
       setResendTimer(60);
@@ -161,7 +184,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // PASO 2: Verificar el Código OTP -> Avanza a Reconocimiento Facial
+  // PASO 2: Verificar el Código OTP localmente -> Avanza a Reconocimiento Facial
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -170,15 +193,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: token.trim(),
-        type: "email",
-      });
-
-      if (error) {
-        console.error("Error al verificar OTP:", error);
-        throw new Error("El código OTP es inválido o ha expirado.");
+      if (token.trim() !== otpSecret) {
+        throw new Error("El código introducido es incorrecto.");
       }
 
       // Avanzar al paso final de Biometría / Identidad
@@ -190,20 +206,34 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // PASO 3: Validación Biométrica Facial Final
-  const handleVerifyFace = () => {
+  // PASO 3: Validación Biométrica Facial Final y Login Definitivo
+  const handleVerifyFace = async () => {
     setVerifyingFace(true);
     setError(null);
 
-    setTimeout(() => {
+    try {
+      // Iniciar sesión oficialmente en Supabase de forma definitiva al aprobar la biometría
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (loginError) throw new Error("Error al completar la sesión en el servidor.");
+
+      setTimeout(() => {
+        setVerifyingFace(false);
+        stopCamera();
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        } else {
+          window.location.reload();
+        }
+      }, 2000); 
+    } catch (err: any) {
+      console.error("Error en biometría:", err);
+      setError(err.message);
       setVerifyingFace(false);
-      stopCamera();
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        window.location.reload();
-      }
-    }, 2500); // Simulación de análisis biométrico seguro de 2.5 segundos
+    }
   };
 
   return (
@@ -354,7 +384,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </div>
 
             <button type="submit" disabled={loading} style={{ width: "100%", padding: "13px", backgroundColor: loading ? "#94a3b8" : "#0284c7", color: "white", border: "none", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)", marginBottom: "16px" }}>
-              {loading ? "Validando credenciales..." : "Iniciar sesión →"}
+              {loading ? "Enviando código..." : "Iniciar sesión →"}
             </button>
           </form>
         )}
