@@ -6,7 +6,6 @@ interface LoginProps {
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
-  // Estados para controlar los pasos: "access" | "code" | "identity"
   const [step, setStep] = useState<"access" | "code" | "identity">("access");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +24,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
-      // 1. Validar correo y contraseña
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -35,10 +33,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error("Correo o contraseña incorrectos.");
       }
 
-      // Cerramos sesión temporalmente para exigir el segundo factor por seguridad
       await supabase.auth.signOut();
 
-      // 2. Enviar el código OTP a su correo
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
         options: { shouldCreateUser: false },
@@ -46,12 +42,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (otpError) {
         if (otpError.status === 429) {
-          throw new Error("Demasiados intentos. Espera unos minutos o usa acceso directo temporal.");
+          throw new Error("Demasiados intentos. Espera unos minutos.");
         }
         throw new Error(otpError.message || "Error al enviar el código OTP.");
       }
 
-      // 3. Pasamos visualmente al Paso 2: Código
       setStep("code");
     } catch (err: any) {
       setError(err.message || "Ocurrió un error al procesar la solicitud.");
@@ -77,7 +72,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (error) throw new Error("El código OTP es inválido o ha expirado.");
 
-      // Si todo es correcto, entramos al sistema (o pasaremos al Paso 3 de Identidad próximamente)
       if (onLoginSuccess) {
         onLoginSuccess();
       } else {
@@ -93,23 +87,23 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div style={{
       minHeight: "100vh",
-      backgroundColor: "#05070f",
-      backgroundImage: "radial-gradient(circle at 50% 0%, #0c152d 0%, #05070f 75%)",
+      backgroundColor: "#f8fafc",
+      backgroundImage: "radial-gradient(circle at 50% 0%, #e0f2fe 0%, #f8fafc 75%)",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
       fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-      color: "#f8fafc",
+      color: "#0f172a",
       padding: "24px"
     }}>
       <div style={{
         width: "100%",
         maxWidth: "460px",
-        backgroundColor: "#080c18",
-        border: "1px solid rgba(255, 255, 255, 0.08)",
+        backgroundColor: "#ffffff",
+        border: "1px solid #e2e8f0",
         borderRadius: "24px",
         padding: "40px 36px",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.8)"
+        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)"
       }}>
         
         {/* Icono de Seguridad Superior */}
@@ -117,27 +111,27 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div style={{
             width: "48px",
             height: "48px",
-            background: "rgba(14, 165, 233, 0.1)",
-            border: "1px solid rgba(14, 165, 233, 0.3)",
+            background: "#e0f2fe",
+            border: "1px solid #bae6fd",
             borderRadius: "12px",
             display: "inline-flex",
             justifyContent: "center",
             alignItems: "center",
             fontSize: "20px",
-            color: "#38bdf8",
+            color: "#0284c7",
             marginBottom: "12px"
           }}>
             🛡️
           </div>
-          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: "0 0 4px 0", letterSpacing: "-0.02em" }}>
-            Empresa <span style={{ color: "#0ea5e9" }}>Inteligente</span>
+          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: "0 0 4px 0", letterSpacing: "-0.02em", color: "#0f172a" }}>
+            Empresa <span style={{ color: "#0284c7" }}>Inteligente</span>
           </h1>
           <p style={{ fontSize: "11px", color: "#64748b", margin: 0, letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600" }}>
             SISTEMA DE GESTIÓN EMPRESARIAL
           </p>
         </div>
 
-        {/* Indicadores de Pasos de Seguridad (Acceso -> Código -> Identidad) */}
+        {/* Indicadores de Pasos de Seguridad */}
         <div style={{
           display: "flex",
           justifyContent: "space-between",
@@ -146,69 +140,68 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           padding: "0 10px",
           position: "relative"
         }}>
-          {/* Línea conectora de fondo */}
           <div style={{
             position: "absolute",
             top: "20px",
             left: "40px",
             right: "40px",
             height: "2px",
-            backgroundColor: "#1e293b",
+            backgroundColor: "#e2e8f0",
             zIndex: 1
           }} />
 
-          {/* Paso 1: Acceso */}
+          {/* Paso 1 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
             <div style={{
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              backgroundColor: step === "access" ? "#0ea5e9" : "#0f172a",
-              border: `1px solid ${step === "access" ? "#38bdf8" : "#1e293b"}`,
+              backgroundColor: step === "access" ? "#0284c7" : "#f1f5f9",
+              border: `1px solid ${step === "access" ? "#0284c7" : "#cbd5e1"}`,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
               color: step === "access" ? "#fff" : "#64748b",
               fontSize: "16px",
-              boxShadow: step === "access" ? "0 0 15px rgba(14, 165, 233, 0.4)" : "none"
+              boxShadow: step === "access" ? "0 4px 12px rgba(2, 132, 199, 0.3)" : "none"
             }}>
               🔒
             </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "access" ? "#38bdf8" : "#64748b", fontWeight: "600" }}>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "access" ? "#0284c7" : "#64748b", fontWeight: "600" }}>
               Acceso
             </span>
           </div>
 
-          {/* Paso 2: Código */}
+          {/* Paso 2 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
             <div style={{
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              backgroundColor: step === "code" ? "#0ea5e9" : "#0f172a",
-              border: `1px solid ${step === "code" ? "#38bdf8" : "#1e293b"}`,
+              backgroundColor: step === "code" ? "#0284c7" : "#f1f5f9",
+              border: `1px solid ${step === "code" ? "#0284c7" : "#cbd5e1"}`,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
               color: step === "code" ? "#fff" : "#64748b",
               fontSize: "16px",
-              boxShadow: step === "code" ? "0 0 15px rgba(14, 165, 233, 0.4)" : "none"
+              boxShadow: step === "code" ? "0 4px 12px rgba(2, 132, 199, 0.3)" : "none"
             }}>
               🔢
             </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "code" ? "#38bdf8" : "#64748b", fontWeight: "600" }}>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "code" ? "#0284c7" : "#64748b", fontWeight: "600" }}>
               Código
             </span>
           </div>
 
-          {/* Paso 3: Identidad (Próximamente) */}
+          {/* Paso 3 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
             <div style={{
               width: "40px",
               height: "40px",
               borderRadius: "12px",
-              backgroundColor: step === "identity" ? "#0ea5e9" : "#0f172a",
-              border: `1px solid ${step === "identity" ? "#38bdf8" : "#1e293b"}`,
+              backgroundColor: step === "identity" ? "#0284c7" : "#f1f5f9",
+              border: `1px solid ${step === "identity" ? "#0284c7" : "#cbd5e1"}`,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
@@ -217,20 +210,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             }}>
               👤
             </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "identity" ? "#38bdf8" : "#64748b", fontWeight: "600" }}>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "identity" ? "#0284c7" : "#64748b", fontWeight: "600" }}>
               Identidad
             </span>
           </div>
         </div>
 
-        {/* Títulos dinámicos según el paso */}
+        {/* Títulos dinámicos */}
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "18px", fontWeight: "600", margin: "0 0 4px 0", color: "#f8fafc" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: "600", margin: "0 0 4px 0", color: "#0f172a" }}>
             {step === "access" && "Bienvenido de nuevo"}
             {step === "code" && "Verificación de Código"}
             {step === "identity" && "Verificación Facial / Identidad"}
           </h2>
-          <p style={{ fontSize: "13px", color: "#94a3b8", margin: 0 }}>
+          <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
             {step === "access" && "Ingresa tus credenciales para acceder"}
             {step === "code" && "Introduce el código de 8 dígitos enviado a tu correo"}
             {step === "identity" && "Validación biométrica de seguridad"}
@@ -239,9 +232,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
         {error && (
           <div style={{
-            backgroundColor: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "#fca5a5",
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#dc2626",
             padding: "10px 14px",
             borderRadius: "8px",
             fontSize: "12px",
@@ -254,11 +247,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </div>
         )}
 
-        {/* PASO 1: ACCESO (Credenciales) */}
+        {/* PASO 1: ACCESO */}
         {step === "access" && (
           <form onSubmit={handleAccessSubmit}>
             <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: "#94a3b8" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: "#334155" }}>
                 Correo electrónico
               </label>
               <div style={{ position: "relative" }}>
@@ -272,10 +265,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   style={{
                     width: "100%",
                     padding: "12px 14px 12px 40px",
-                    backgroundColor: "#020617",
-                    border: "1px solid #1e293b",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #cbd5e1",
                     borderRadius: "10px",
-                    color: "white",
+                    color: "#0f172a",
                     fontSize: "13px",
                     outline: "none",
                     boxSizing: "border-box"
@@ -285,7 +278,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </div>
 
             <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: "#94a3b8" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: "#334155" }}>
                 Contraseña
               </label>
               <div style={{ position: "relative" }}>
@@ -299,10 +292,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   style={{
                     width: "100%",
                     padding: "12px 40px 12px 40px",
-                    backgroundColor: "#020617",
-                    border: "1px solid #1e293b",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #cbd5e1",
                     borderRadius: "10px",
-                    color: "white",
+                    color: "#0f172a",
                     fontSize: "13px",
                     outline: "none",
                     boxSizing: "border-box"
@@ -328,16 +321,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", fontSize: "12px" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "#94a3b8", cursor: "pointer" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "#475569", cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ accentColor: "#0ea5e9" }}
+                  style={{ accentColor: "#0284c7" }}
                 />
                 Recordarme
               </label>
-              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert("Contacta a administración para restablecer tu clave."); }} style={{ color: "#38bdf8", textDecoration: "none" }}>
+              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert("Contacta a administración."); }} style={{ color: "#0284c7", textDecoration: "none", fontWeight: "500" }}>
                 ¿Olvidaste tu contraseña?
               </a>
             </div>
@@ -348,15 +341,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               style={{
                 width: "100%",
                 padding: "13px",
-                backgroundColor: loading ? "#334155" : "#0891b2",
+                backgroundColor: loading ? "#94a3b8" : "#0284c7",
                 color: "white",
                 border: "none",
                 borderRadius: "10px",
                 fontWeight: "600",
                 fontSize: "14px",
                 cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(8, 145, 178, 0.4)",
-                transition: "background-color 0.2s",
+                boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)",
                 marginBottom: "16px"
               }}
             >
@@ -364,20 +356,21 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </button>
 
             <div style={{
-              backgroundColor: "rgba(14, 165, 233, 0.05)",
-              border: "1px solid rgba(14, 165, 233, 0.15)",
+              backgroundColor: "#f0f9ff",
+              border: "1px solid #bae6fd",
               borderRadius: "8px",
               padding: "10px",
               textAlign: "center",
               fontSize: "11px",
-              color: "#38bdf8"
+              color: "#0369a1",
+              fontWeight: "500"
             }}>
               🛡️ Al continuar, se enviará un código OTP de verificación.
             </div>
           </form>
         )}
 
-        {/* PASO 2: CÓDIGO (OTP de 8 dígitos) */}
+        {/* PASO 2: CÓDIGO */}
         {step === "code" && (
           <form onSubmit={handleCodeSubmit}>
             <div style={{ marginBottom: "24px" }}>
@@ -391,10 +384,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 style={{
                   width: "100%",
                   padding: "16px",
-                  backgroundColor: "#020617",
-                  border: "1px solid #1e293b",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #cbd5e1",
                   borderRadius: "12px",
-                  color: "#38bdf8",
+                  color: "#0284c7",
                   fontSize: "24px",
                   letterSpacing: "6px",
                   textAlign: "center",
@@ -411,14 +404,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               style={{
                 width: "100%",
                 padding: "13px",
-                backgroundColor: loading ? "#334155" : "#16a34a",
+                backgroundColor: loading ? "#94a3b8" : "#16a34a",
                 color: "white",
                 border: "none",
                 borderRadius: "10px",
                 fontWeight: "600",
                 fontSize: "14px",
                 cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(22, 163, 74, 0.4)",
+                boxShadow: "0 4px 14px rgba(22, 163, 74, 0.3)",
                 marginBottom: "12px"
               }}
             >
@@ -447,10 +440,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         <div style={{
           marginTop: "28px",
           paddingTop: "20px",
-          borderTop: "1px solid rgba(255, 255, 255, 0.05)",
+          borderTop: "1px solid #e2e8f0",
           textAlign: "center",
           fontSize: "10px",
-          color: "#475569"
+          color: "#94a3b8"
         }}>
           🔒 Conexión encriptada E2EE • Empresa Inteligente 2026
         </div>
