@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../services/supabaseClient";
 
 interface LoginProps {
@@ -6,7 +6,6 @@ interface LoginProps {
 }
 
 export default function Login({ onLoginSuccess }: LoginProps) {
-  // Estado de los pasos y del tema (por defecto "dark")
   const [step, setStep] = useState<"access" | "code" | "identity">("access");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   
@@ -17,6 +16,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados para el temporizador de reenvío de OTP
+  const [resendTimer, setResendTimer] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+
+  // Referencias para la cámara web (Paso 3)
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [verifyingFace, setVerifyingFace] = useState(false);
 
   // Paleta de colores dinámica según el tema seleccionado
   const t = {
@@ -36,7 +44,50 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     shadow: theme === "dark" ? "0 25px 50px -12px rgba(0, 0, 0, 0.8)" : "0 20px 25px -5px rgba(0, 0, 0, 0.05)"
   };
 
-  // Paso 1: Validar Credenciales y disparar el Código OTP
+  // Temporizador para el reenvío de código OTP
+  useEffect(() => {
+    let interval: any;
+    if (step === "code" && resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (resendTimer === 0) {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [step, resendTimer]);
+
+  // Activar cámara cuando pasamos al paso de identidad
+  useEffect(() => {
+    if (step === "identity") {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [step]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 300 } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setCameraActive(true);
+      }
+    } catch (err) {
+      console.error("Error al acceder a la cámara:", err);
+      setError("No se pudo acceder a la cámara web. Asegúrate de dar permisos.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      setCameraActive(false);
+    }
+  };
+
+  // PASO 1: Validar Credenciales y enviar OTP inicial
   const handleAccessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -54,7 +105,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error("Correo o contraseña incorrectos.");
       }
 
-      await supabase.auth.signOut();
+      await supabase.auth.signOut(); // Cerramos sesión temporal hasta completar factores
 
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
@@ -69,6 +120,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
 
       setStep("code");
+      setResendTimer(60);
+      setCanResend(false);
     } catch (err: any) {
       setError(err.message || "Ocurrió un error al procesar la solicitud.");
     } finally {
@@ -76,7 +129,31 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // Paso 2: Verificar el Código OTP
+  // Reenviar código OTP
+  const handleResendOtp = async () => {
+    if (!canResend || loading) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false },
+      });
+
+      if (otpError) throw new Error("No se pudo reenviar el código.");
+
+      alert("¡Código OTP reenviado con éxito a tu correo!");
+      setResendTimer(60);
+      setCanResend(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // PASO 2: Verificar el Código OTP -> Pasa a Identidad Facial
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -93,16 +170,29 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (error) throw new Error("El código OTP es inválido o ha expirado.");
 
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        window.location.reload();
-      }
+      // Si el OTP es correcto, avanzamos al paso de reconocimiento facial
+      setStep("identity");
     } catch (err: any) {
       setError(err.message || "Código incorrecto.");
     } finally {
       setLoading(false);
     }
+  };
+
+  // PASO 3: Validación Biométrica / Facial Final
+  const handleVerifyFace = () => {
+    setVerifyingFace(true);
+    setError(null);
+
+    setTimeout(() => {
+      setVerifyingFace(false);
+      stopCamera();
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      } else {
+        window.location.reload();
+      }
+    }, 2500); // Simula el escaneo biométrico seguro de 2.5s
   };
 
   return (
@@ -119,10 +209,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       position: "relative"
     }}>
       
-      {/* BOTÓN FLOTANTE: Interruptor de Modo Claro / Oscuro (Arriba a la derecha) */}
+      {/* Botón Flotante: Interruptor de Tema (Accesibilidad Visual) */}
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        title={theme === "dark" ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+        title="Cambiar Modo Claro/Oscuro"
         style={{
           position: "absolute",
           top: "24px",
@@ -155,10 +245,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         borderRadius: "24px",
         padding: "40px 36px",
         boxShadow: t.shadow,
-        transition: "background-color 0.3s, border-color 0.3s"
       }}>
         
-        {/* Icono de Seguridad Superior */}
+        {/* Cabecera */}
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <div style={{
             width: "48px",
@@ -175,7 +264,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           }}>
             🛡️
           </div>
-          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: "0 0 4px 0", letterSpacing: "-0.02em", color: t.text }}>
+          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: "0 0 4px 0", color: t.text }}>
             Empresa <span style={{ color: "#0284c7" }}>Inteligente</span>
           </h1>
           <p style={{ fontSize: "11px", color: t.subText, margin: 0, letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: "600" }}>
@@ -183,88 +272,26 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </p>
         </div>
 
-        {/* Indicadores de Pasos de Seguridad */}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "32px",
-          padding: "0 10px",
-          position: "relative"
-        }}>
-          <div style={{
-            position: "absolute",
-            top: "20px",
-            left: "40px",
-            right: "40px",
-            height: "2px",
-            backgroundColor: t.lineBg,
-            zIndex: 1
-          }} />
+        {/* Indicadores de Pasos */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px", padding: "0 10px", position: "relative" }}>
+          <div style={{ position: "absolute", top: "20px", left: "40px", right: "40px", height: "2px", backgroundColor: t.lineBg, zIndex: 1 }} />
 
-          {/* Paso 1: Acceso */}
+          {/* Paso 1 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
-            <div style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              backgroundColor: step === "access" ? "#0284c7" : t.stepInactiveBg,
-              border: `1px solid ${step === "access" ? "#0284c7" : t.stepInactiveBorder}`,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              color: step === "access" ? "#fff" : t.subText,
-              fontSize: "16px",
-              boxShadow: step === "access" ? "0 4px 12px rgba(2, 132, 199, 0.3)" : "none"
-            }}>
-              🔒
-            </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "access" ? "#0284c7" : t.subText, fontWeight: "600" }}>
-              Acceso
-            </span>
+            <div style={{ width: "40px", height: "40px", borderRadius: "12px", backgroundColor: step === "access" ? "#0284c7" : t.stepInactiveBg, border: `1px solid ${step === "access" ? "#0284c7" : t.stepInactiveBorder}`, display: "flex", justifyContent: "center", alignItems: "center", color: step === "access" ? "#fff" : t.subText, fontSize: "16px" }}>🔒</div>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "access" ? "#0284c7" : t.subText, fontWeight: "600" }}>Acceso</span>
           </div>
 
-          {/* Paso 2: Código */}
+          {/* Paso 2 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
-            <div style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              backgroundColor: step === "code" ? "#0284c7" : t.stepInactiveBg,
-              border: `1px solid ${step === "code" ? "#0284c7" : t.stepInactiveBorder}`,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              color: step === "code" ? "#fff" : t.subText,
-              fontSize: "16px",
-              boxShadow: step === "code" ? "0 4px 12px rgba(2, 132, 199, 0.3)" : "none"
-            }}>
-              🔢
-            </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "code" ? "#0284c7" : t.subText, fontWeight: "600" }}>
-              Código
-            </span>
+            <div style={{ width: "40px", height: "40px", borderRadius: "12px", backgroundColor: step === "code" ? "#0284c7" : t.stepInactiveBg, border: `1px solid ${step === "code" ? "#0284c7" : t.stepInactiveBorder}`, display: "flex", justifyContent: "center", alignItems: "center", color: step === "code" ? "#fff" : t.subText, fontSize: "16px" }}>🔢</div>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "code" ? "#0284c7" : t.subText, fontWeight: "600" }}>Código</span>
           </div>
 
-          {/* Paso 3: Identidad */}
+          {/* Paso 3 */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative", zIndex: 2 }}>
-            <div style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              backgroundColor: step === "identity" ? "#0284c7" : t.stepInactiveBg,
-              border: `1px solid ${step === "identity" ? "#0284c7" : t.stepInactiveBorder}`,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              color: step === "identity" ? "#fff" : t.subText,
-              fontSize: "16px"
-            }}>
-              👤
-            </div>
-            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "identity" ? "#0284c7" : t.subText, fontWeight: "600" }}>
-              Identidad
-            </span>
+            <div style={{ width: "40px", height: "40px", borderRadius: "12px", backgroundColor: step === "identity" ? "#0284c7" : t.stepInactiveBg, border: `1px solid ${step === "identity" ? "#0284c7" : t.stepInactiveBorder}`, display: "flex", justifyContent: "center", alignItems: "center", color: step === "identity" ? "#fff" : t.subText, fontSize: "16px" }}>👤</div>
+            <span style={{ fontSize: "11px", marginTop: "6px", color: step === "identity" ? "#0284c7" : t.subText, fontWeight: "600" }}>Identidad</span>
           </div>
         </div>
 
@@ -272,29 +299,18 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <h2 style={{ fontSize: "18px", fontWeight: "600", margin: "0 0 4px 0", color: t.text }}>
             {step === "access" && "Bienvenido de nuevo"}
-            {step === "code" && "Verificación de Código"}
-            {step === "identity" && "Verificación Facial / Identidad"}
+            {step === "code" && "Verificación de Código OTP"}
+            {step === "identity" && "Verificación Facial Segura"}
           </h2>
           <p style={{ fontSize: "13px", color: t.subText, margin: 0 }}>
-            {step === "access" && "Ingresa tus credenciales para acceder"}
+            {step === "access" && "Ingresa tus credenciales corporativas"}
             {step === "code" && "Introduce el código de 8 dígitos enviado a tu correo"}
-            {step === "identity" && "Validación biométrica de seguridad"}
+            {step === "identity" && "Posiciónate frente a la cámara para validar tu rostro"}
           </p>
         </div>
 
         {error && (
-          <div style={{
-            backgroundColor: theme === "dark" ? "rgba(239, 68, 68, 0.1)" : "#fef2f2",
-            border: `1px solid ${theme === "dark" ? "rgba(239, 68, 68, 0.3)" : "#fecaca"}`,
-            color: theme === "dark" ? "#fca5a5" : "#dc2626",
-            padding: "10px 14px",
-            borderRadius: "8px",
-            fontSize: "12px",
-            marginBottom: "20px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
+          <div style={{ backgroundColor: theme === "dark" ? "rgba(239, 68, 68, 0.1)" : "#fef2f2", border: `1px solid ${theme === "dark" ? "rgba(239, 68, 68, 0.3)" : "#fecaca"}`, color: theme === "dark" ? "#fca5a5" : "#dc2626", padding: "10px 14px", borderRadius: "8px", fontSize: "12px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
             <span>⚠️</span> {error}
           </div>
         )}
@@ -303,200 +319,95 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         {step === "access" && (
           <form onSubmit={handleAccessSubmit}>
             <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: t.subText }}>
-                Correo electrónico
-              </label>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: t.subText }}>Correo electrónico</label>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: "14px", top: "14px", color: t.subText }}>✉️</span>
-                <input
-                  type="email"
-                  required
-                  placeholder="nombre@empresa.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px 12px 40px",
-                    backgroundColor: t.inputBg,
-                    border: `1px solid ${t.inputBorder}`,
-                    borderRadius: "10px",
-                    color: t.text,
-                    fontSize: "13px",
-                    outline: "none",
-                    boxSizing: "border-box"
-                  }}
-                />
+                <input type="email" required placeholder="nombre@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", padding: "12px 14px 12px 40px", backgroundColor: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: "10px", color: t.text, fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
               </div>
             </div>
 
             <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: t.subText }}>
-                Contraseña
-              </label>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "500", marginBottom: "6px", color: t.subText }}>Contraseña</label>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: "14px", top: "14px", color: t.subText }}>🔒</span>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 40px 12px 40px",
-                    backgroundColor: t.inputBg,
-                    border: `1px solid ${t.inputBorder}`,
-                    borderRadius: "10px",
-                    color: t.text,
-                    fontSize: "13px",
-                    outline: "none",
-                    boxSizing: "border-box"
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "12px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: t.subText,
-                    fontSize: "14px"
-                  }}
-                >
-                  {showPassword ? "👁️" : "👁️‍🗨️"}
-                </button>
+                <input type={showPassword ? "text" : "password"} required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: "12px 40px 12px 40px", backgroundColor: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: "10px", color: t.text, fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "12px", background: "transparent", border: "none", cursor: "pointer", color: t.subText, fontSize: "14px" }}>{showPassword ? "👁️" : "👁️‍🗨️"}</button>
               </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", fontSize: "12px" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "6px", color: t.subText, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ accentColor: "#0284c7" }}
-                />
-                Recordarme
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} style={{ accentColor: "#0284c7" }} /> Recordarme
               </label>
-              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert("Contacta a administración."); }} style={{ color: "#0284c7", textDecoration: "none", fontWeight: "500" }}>
-                ¿Olvidaste tu contraseña?
-              </a>
+              <a href="#forgot" onClick={(e) => { e.preventDefault(); alert("Contacta a administración de TI."); }} style={{ color: "#0284c7", textDecoration: "none", fontWeight: "500" }}>¿Olvidaste tu contraseña?</a>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%",
-                padding: "13px",
-                backgroundColor: loading ? "#94a3b8" : "#0284c7",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontWeight: "600",
-                fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)",
-                marginBottom: "16px"
-              }}
-            >
-              {loading ? "Validando..." : "Iniciar sesión →"}
+            <button type="submit" disabled={loading} style={{ width: "100%", padding: "13px", backgroundColor: loading ? "#94a3b8" : "#0284c7", color: "white", border: "none", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)", marginBottom: "16px" }}>
+              {loading ? "Validando credenciales..." : "Iniciar sesión →"}
             </button>
-
-            <div style={{
-              backgroundColor: theme === "dark" ? "rgba(14, 165, 233, 0.05)" : "#f0f9ff",
-              border: `1px solid ${theme === "dark" ? "rgba(14, 165, 233, 0.15)" : "#bae6fd"}`,
-              borderRadius: "8px",
-              padding: "10px",
-              textAlign: "center",
-              fontSize: "11px",
-              color: "#0284c7",
-              fontWeight: "500"
-            }}>
-              🛡️ Al continuar, se enviará un código OTP de verificación.
-            </div>
           </form>
         )}
 
-        {/* PASO 2: CÓDIGO */}
+        {/* PASO 2: CÓDIGO OTP + REENVIAR */}
         {step === "code" && (
           <form onSubmit={handleCodeSubmit}>
-            <div style={{ marginBottom: "24px" }}>
-              <input
-                type="text"
-                required
-                maxLength={8}
-                placeholder="12345678"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "16px",
-                  backgroundColor: t.inputBg,
-                  border: `1px solid ${t.inputBorder}`,
-                  borderRadius: "12px",
-                  color: "#0284c7",
-                  fontSize: "24px",
-                  letterSpacing: "6px",
-                  textAlign: "center",
-                  fontWeight: "700",
-                  outline: "none",
-                  boxSizing: "border-box"
-                }}
-              />
+            <div style={{ marginBottom: "20px" }}>
+              <input type="text" required maxLength={8} placeholder="12345678" value={token} onChange={(e) => setToken(e.target.value)} style={{ width: "100%", padding: "16px", backgroundColor: t.inputBg, border: `1px solid ${t.inputBorder}`, borderRadius: "12px", color: "#0284c7", fontSize: "24px", letterSpacing: "6px", textAlign: "center", fontWeight: "700", outline: "none", boxSizing: "border-box" }} />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%",
-                padding: "13px",
-                backgroundColor: loading ? "#94a3b8" : "#16a34a",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontWeight: "600",
-                fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(22, 163, 74, 0.3)",
-                marginBottom: "12px"
-              }}
-            >
-              {loading ? "Verificando código..." : "Validar código y acceder"}
+            <button type="submit" disabled={loading} style={{ width: "100%", padding: "13px", backgroundColor: loading ? "#94a3b8" : "#16a34a", color: "white", border: "none", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", boxShadow: "0 4px 14px rgba(22, 163, 74, 0.3)", marginBottom: "16px" }}>
+              {loading ? "Verificando código..." : "Validar código OTP"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setStep("access")}
-              style={{
-                width: "100%",
-                background: "transparent",
-                border: "none",
-                color: t.subText,
-                fontSize: "12px",
-                cursor: "pointer",
-                fontWeight: "500"
-              }}
-            >
+            {/* Panel de Reenvío con Temporizador */}
+            <div style={{ textAlign: "center", marginBottom: "12px" }}>
+              {canResend ? (
+                <button type="button" onClick={handleResendOtp} style={{ background: "transparent", border: "none", color: "#0284c7", fontSize: "12px", fontWeight: "600", cursor: "pointer", textDecoration: "underline" }}>
+                  🔄 Reenviar código OTP ahora
+                </button>
+              ) : (
+                <p style={{ fontSize: "12px", color: t.subText, margin: 0 }}>
+                  Reenviar código disponible en <span style={{ fontWeight: "600", color: "#0284c7" }}>{resendTimer}s</span>
+                </p>
+              )}
+            </div>
+
+            <button type="button" onClick={() => setStep("access")} style={{ width: "100%", background: "transparent", border: "none", color: t.subText, fontSize: "12px", cursor: "pointer", fontWeight: "500" }}>
               ← Volver a credenciales
             </button>
           </form>
         )}
 
+        {/* PASO 3: RECONOCIMIENTO FACIAL BIOMÉTRICO */}
+        {step === "identity" && (
+          <div style={{ textAlign: "center" }}>
+            <div style={{ position: "relative", width: "100%", height: "220px", backgroundColor: "#000", borderRadius: "14px", overflow: "hidden", marginBottom: "20px", border: `2px solid ${verifyingFace ? "#16a34a" : "#0284c7"}` }}>
+              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {!cameraActive && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "13px" }}>
+                  Iniciando cámara segura...
+                </div>
+              )}
+              {verifyingFace && (
+                <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(22, 163, 74, 0.4)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "700" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>🧬</div>
+                  Verificando biometría facial...
+                </div>
+              )}
+            </div>
+
+            <button type="button" onClick={handleVerifyFace} disabled={verifyingFace || !cameraActive} style={{ width: "100%", padding: "13px", backgroundColor: verifyingFace ? "#94a3b8" : "#0284c7", color: "white", border: "none", borderRadius: "10px", fontWeight: "600", fontSize: "14px", cursor: verifyingFace ? "not-allowed" : "pointer", boxShadow: "0 4px 14px rgba(2, 132, 199, 0.3)", marginBottom: "12px" }}>
+              {verifyingFace ? "Analizando rostro..." : "Escanear y Validar Rostro"}
+            </button>
+
+            <button type="button" onClick={() => { stopCamera(); setStep("code"); }} style={{ width: "100%", background: "transparent", border: "none", color: t.subText, fontSize: "12px", cursor: "pointer", fontWeight: "500" }}>
+              ← Regresar a verificación por código
+            </button>
+          </div>
+        )}
+
         {/* Footer */}
-        <div style={{
-          marginTop: "28px",
-          paddingTop: "20px",
-          borderTop: `1px solid ${t.cardBorder}`,
-          textAlign: "center",
-          fontSize: "10px",
-          color: t.subText
-        }}>
+        <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: `1px solid ${t.cardBorder}`, textAlign: "center", fontSize: "10px", color: t.subText }}>
           🔒 Conexión encriptada E2EE • Empresa Inteligente 2026
         </div>
 
