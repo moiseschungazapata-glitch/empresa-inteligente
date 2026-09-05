@@ -75,7 +75,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
     } catch (err) {
       console.error("Error al acceder a la cámara:", err);
-      setError("No se pudo acceder a la cámara web. Asegúrate de dar permisos.");
+      setError("No se pudo acceder a la cámara web. Asegúrate de dar permisos en tu navegador.");
     }
   };
 
@@ -87,7 +87,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // PASO 1: Validar Credenciales y enviar OTP inicial
+  // PASO 1: Validar Credenciales y enviar OTP inicial con manejo estricto de errores
   const handleAccessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -96,40 +96,47 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
 
     try {
+      // 1. Validar correo y contraseña
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
       if (authError || !authData.user) {
-        throw new Error("Correo o contraseña incorrectos.");
+        console.error("Error de autenticación Supabase:", authError);
+        throw new Error(authError?.message || "Correo o contraseña incorrectos.");
       }
 
-      await supabase.auth.signOut(); // Cerramos sesión temporal hasta completar factores
+      // 2. Cerrar sesión temporalmente para obligar completar la autenticación por factores (OTP + Biometría)
+      await supabase.auth.signOut();
 
+      // 3. Solicitar envío de código OTP al correo
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim(),
         options: { shouldCreateUser: false },
       });
 
       if (otpError) {
+        console.error("Error al enviar OTP Supabase:", otpError);
         if (otpError.status === 429) {
-          throw new Error("Demasiados intentos. Espera unos minutos.");
+          throw new Error("Demasiados intentos. Espera unos minutos antes de volver a intentar.");
         }
-        throw new Error(otpError.message || "Error al enviar el código OTP.");
+        throw new Error(otpError.message || "Error al enviar el código OTP. Verifica tu proveedor de correo en Supabase.");
       }
 
+      // Éxito: Avanzar al paso del Código
       setStep("code");
       setResendTimer(60);
       setCanResend(false);
     } catch (err: any) {
+      console.error("Excepción en handleAccessSubmit:", err);
       setError(err.message || "Ocurrió un error al procesar la solicitud.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Reenviar código OTP
+  // Reenviar código OTP con temporizador funcional
   const handleResendOtp = async () => {
     if (!canResend || loading) return;
     setLoading(true);
@@ -137,23 +144,24 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim(),
         options: { shouldCreateUser: false },
       });
 
-      if (otpError) throw new Error("No se pudo reenviar el código.");
+      if (otpError) throw new Error(otpError.message || "No se pudo reenviar el código.");
 
       alert("¡Código OTP reenviado con éxito a tu correo!");
       setResendTimer(60);
       setCanResend(false);
     } catch (err: any) {
+      console.error("Error al reenviar OTP:", err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // PASO 2: Verificar el Código OTP -> Pasa a Identidad Facial
+  // PASO 2: Verificar el Código OTP -> Avanza a Reconocimiento Facial
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -163,14 +171,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       const { error } = await supabase.auth.verifyOtp({
-        email,
+        email: email.trim(),
         token: token.trim(),
         type: "email",
       });
 
-      if (error) throw new Error("El código OTP es inválido o ha expirado.");
+      if (error) {
+        console.error("Error al verificar OTP:", error);
+        throw new Error("El código OTP es inválido o ha expirado.");
+      }
 
-      // Si el OTP es correcto, avanzamos al paso de reconocimiento facial
+      // Avanzar al paso final de Biometría / Identidad
       setStep("identity");
     } catch (err: any) {
       setError(err.message || "Código incorrecto.");
@@ -179,7 +190,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  // PASO 3: Validación Biométrica / Facial Final
+  // PASO 3: Validación Biométrica Facial Final
   const handleVerifyFace = () => {
     setVerifyingFace(true);
     setError(null);
@@ -192,7 +203,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       } else {
         window.location.reload();
       }
-    }, 2500); // Simula el escaneo biométrico seguro de 2.5s
+    }, 2500); // Simulación de análisis biométrico seguro de 2.5 segundos
   };
 
   return (
@@ -209,7 +220,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       position: "relative"
     }}>
       
-      {/* Botón Flotante: Interruptor de Tema (Accesibilidad Visual) */}
+      {/* Botón Flotante: Interruptor de Tema (Modo Claro / Oscuro) */}
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         title="Cambiar Modo Claro/Oscuro"
