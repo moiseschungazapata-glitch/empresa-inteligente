@@ -442,7 +442,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             </button>
 
             <button type="button" onClick={() => { stopCamera(); setStep("code"); }} style={{ width: "100%", background: "transparent", border: "none", color: t.subText, fontSize: "12px", cursor: "pointer", fontWeight: "500" }}>
-              ← Regresar a verificación por código
+              ← Regresar a verificación por codigo
             </button>
           </div>
         )}
