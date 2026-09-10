@@ -40,91 +40,92 @@ export function AnalizarComentario() {
   };
 
   const procesarTextoNLP = (texto: string): ResultadoAnalisis => {
-  const textoClean = texto.toLowerCase();
+    const textoClean = texto.toLowerCase();
 
-  // Palabras para detectar Sentimiento
-  const palabrasPositivas = [
-    "excelente", "bueno", "rápido", "gracias", "fantástico", 
-    "atención", "eficiente", "satisfecho", "quisiera", "por favor", 
-    "adquirir", "me gusta", "interesado"
-  ];
-  const palabrasNegativas = [
-    "problema", "problemas", "lento", "fallas", "falla", "tarde", "malo", 
-    "error", "pésimo", "queja", "mal", "no funciona"
-  ];
+    // Palabras para detectar Sentimiento
+    const palabrasPositivas = [
+      "excelente", "bueno", "rápido", "gracias", "fantástico", 
+      "atención", "eficiente", "satisfecho", "quisiera", "por favor", 
+      "adquirir", "me gusta", "interesado", "necesito"
+    ];
+    const palabrasNegativas = [
+      "problema", "problemas", "lento", "fallas", "falla", "tarde", "malo", 
+      "error", "pésimo", "queja", "mal", "no funciona"
+    ];
 
-  let posHits = 0;
-  let negHits = 0;
-  const palabrasEncontradas: string[] = [];
+    let posHits = 0;
+    let negHits = 0;
+    const palabrasEncontradas: string[] = [];
 
-  palabrasPositivas.forEach((p) => {
-    if (textoClean.includes(p)) {
-      posHits++;
-      palabrasEncontradas.push(p);
+    palabrasPositivas.forEach((p) => {
+      if (textoClean.includes(p)) {
+        posHits++;
+        palabrasEncontradas.push(p);
+      }
+    });
+
+    palabrasNegativas.forEach((p) => {
+      if (textoClean.includes(p)) {
+        negHits++;
+        palabrasEncontradas.push(p);
+      }
+    });
+
+    // Detectar comentarios mixtos con conectores adversativos (pero, aunque, sin embargo)
+    const tieneConectorMixto = /\b(pero|aunque|sin embargo)\b/i.test(textoClean);
+
+    let sentimiento: "Positivo" | "Negativo" | "Neutral" = "Neutral";
+
+    // Si tiene tanto aspectos positivos como negativos, o incluye un conector de contraste con balance, es Neutral
+    if ((posHits > 0 && negHits > 0) || (tieneConectorMixto && Math.abs(posHits - negHits) <= 1)) {
+      sentimiento = "Neutral";
+    } else if (posHits > negHits) {
+      sentimiento = "Positivo";
+    } else if (negHits > posHits) {
+      sentimiento = "Negativo";
     }
-  });
 
-  palabrasNegativas.forEach((p) => {
-    if (textoClean.includes(p)) {
-      negHits++;
-      palabrasEncontradas.push(p);
+    // Categorías (Ampliadas con soporte para técnicos y asesores)
+    const keywordsSoporte = [
+      "soporte", "sistema", "error", "problema", "problemas", 
+      "técnico", "tecnico", "asesor", "ayuda", "falla", "fallas", 
+      "acceso", "no funciona", "asistencia", "atención"
+    ];
+    const keywordsReclamo = [
+      "llegó tarde", "pésimo", "queja", "malo", "devuelvan", 
+      "molesto", "reclamo", "devolución"
+    ];
+    const keywordsServicio = [
+      "servicio", "adquirir", "comprar", "solicitar", 
+      "contratar", "plan", "precio", "información"
+    ];
+    const keywordsFelicitacion = [
+      "excelente", "buen servicio", "felicitaciones", 
+      "gracias", "maravilloso", "me encanta"
+    ];
+
+    let categoria: "SERVICIO" | "SOPORTE" | "RECLAMO" | "FELICITACION" | "COMENTARIO" = "COMENTARIO";
+
+    if (keywordsSoporte.some((kw) => textoClean.includes(kw))) {
+      categoria = "SOPORTE";
+    } else if (keywordsReclamo.some((kw) => textoClean.includes(kw))) {
+      categoria = "RECLAMO";
+    } else if (keywordsFelicitacion.some((kw) => textoClean.includes(kw))) {
+      categoria = "FELICITACION";
+    } else if (keywordsServicio.some((kw) => textoClean.includes(kw))) {
+      categoria = "SERVICIO";
     }
-  });
 
-  // Detectar comentarios mixtos con conectores adversativos (pero, aunque, sin embargo)
-  const tieneConectorMixto = /\b(pero|aunque|sin embargo)\b/i.test(textoClean);
+    const totalCoincidencias = posHits + negHits;
+    const confianza = Math.min(85 + totalCoincidencias * 4, 98);
 
-  let sentimiento: "Positivo" | "Negativo" | "Neutral" = "Neutral";
-
-  // Si tiene tanto aspectos positivos como negativos, o incluye un conector de contraste con balance, es Neutral
-  if ((posHits > 0 && negHits > 0) || tieneConectorMixto && Math.abs(posHits - negHits) <= 1) {
-    sentimiento = "Neutral";
-  } else if (posHits > negHits) {
-    sentimiento = "Positivo";
-  } else if (negHits > posHits) {
-    sentimiento = "Negativo";
-  }
-
-  // Categorías
-  const keywordsSoporte = [
-    "soporte", "sistema", "error", "problema", "problemas", 
-    "técnico", "ayuda", "falla", "fallas", "acceso", "no funciona"
-  ];
-  const keywordsReclamo = [
-    "llegó tarde", "pésimo", "queja", "malo", "devuelvan", 
-    "molesto", "reclamo", "devolución"
-  ];
-  const keywordsServicio = [
-    "servicio", "adquirir", "comprar", "solicitar", 
-    "contratar", "plan", "precio", "información"
-  ];
-  const keywordsFelicitacion = [
-    "excelente", "buen servicio", "felicitaciones", 
-    "gracias", "maravilloso", "me encanta"
-  ];
-
-  let categoria: "SERVICIO" | "SOPORTE" | "RECLAMO" | "FELICITACION" | "COMENTARIO" = "COMENTARIO";
-
-  if (keywordsSoporte.some((kw) => textoClean.includes(kw))) {
-    categoria = "SOPORTE";
-  } else if (keywordsReclamo.some((kw) => textoClean.includes(kw))) {
-    categoria = "RECLAMO";
-  } else if (keywordsFelicitacion.some((kw) => textoClean.includes(kw))) {
-    categoria = "FELICITACION";
-  } else if (keywordsServicio.some((kw) => textoClean.includes(kw))) {
-    categoria = "SERVICIO";
-  }
-
-  const totalCoincidencias = posHits + negHits;
-  const confianza = Math.min(85 + totalCoincidencias * 4, 98);
-
-  return {
-    sentimiento,
-    categoria,
-    confianza,
-    palabrasClave: palabrasEncontradas,
+    return {
+      sentimiento,
+      categoria,
+      confianza,
+      palabrasClave: palabrasEncontradas,
+    };
   };
-};
 
   const analizarComentarioDirecto = (texto: string) => {
     setComentarioSeleccionado(texto);
