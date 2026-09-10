@@ -22,9 +22,10 @@ export function PalabrasFrecuentes() {
   const obtenerYAnalizarComentarios = async () => {
     setCargando(true);
     try {
+      // 1. Corregido: Se lee la columna 'contenido' de la tabla 'comentarios'
       const { data, error } = await supabase
         .from("comentarios")
-        .select("comentario");
+        .select("contenido");
 
       if (error) throw error;
 
@@ -35,19 +36,21 @@ export function PalabrasFrecuentes() {
 
       setTotalComentarios(data.length);
 
-      // Stopwords o palabras comunes a filtrar
+      // Stopwords en español para ignorar en el análisis
       const ignorar = new Set([
         "de", "la", "que", "el", "en", "y", "a", "los", "del", "se", "las",
-        "por", "un", "para", "con", "no", "una", "su", "al", "lo", "como", "es", "mas"
+        "por", "un", "para", "con", "no", "una", "su", "al", "lo", "como", 
+        "es", "mas", "más", "este", "esta", "estos", "estas", "pero", "sus"
       ]);
 
       const contador: Record<string, number> = {};
       let totalContadas = 0;
 
-      // Se especifica el tipo explícito para 'row' y resolver el error de TypeScript
-      (data as { comentario: string }[]).forEach((row) => {
-        if (!row.comentario) return;
-        const palabras = row.comentario
+      // Recorremos los comentarios leyendo la propiedad 'contenido'
+      (data as { contenido: string }[]).forEach((row) => {
+        if (!row.contenido) return;
+
+        const palabras = row.contenido
           .toLowerCase()
           .replace(/[^\w\sáéíóúñ]/g, "")
           .split(/\s+/);
@@ -89,7 +92,7 @@ export function PalabrasFrecuentes() {
         Palabras frecuentes
       </h1>
       <p style={{ color: "#64748b", marginBottom: "24px" }}>
-        Identificación de las palabras más utilizadas en los comentarios
+        Identificación de las palabras más utilizadas en los comentarios recibidos
       </p>
 
       {/* Cards de Métricas */}
@@ -160,7 +163,7 @@ export function PalabrasFrecuentes() {
           <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
             Palabra principal
           </span>
-          <h2 style={{ fontSize: "28px", margin: "8px 0 0 0", color: "#2563eb" }}>
+          <h2 style={{ fontSize: "28px", margin: "8px 0 0 0", color: "#2563eb", textTransform: "capitalize" }}>
             {palabraPrincipal}
           </h2>
         </div>
@@ -204,7 +207,7 @@ export function PalabrasFrecuentes() {
                 <th style={{ padding: "12px" }}>#</th>
                 <th style={{ padding: "12px" }}>Palabra</th>
                 <th style={{ padding: "12px" }}>Frecuencia</th>
-                <th style={{ padding: "12px" }}>Porcentaje</th>
+                <th style={{ padding: "12px" }}>Porcentaje de presencia</th>
               </tr>
             </thead>
             <tbody>
@@ -216,11 +219,34 @@ export function PalabrasFrecuentes() {
                   <td style={{ padding: "12px", color: "#64748b" }}>
                     #{idx + 1}
                   </td>
-                  <td style={{ padding: "12px", fontWeight: "bold" }}>
+                  <td style={{ padding: "12px", fontWeight: "bold", textTransform: "capitalize" }}>
                     {item.palabra}
                   </td>
                   <td style={{ padding: "12px" }}>{item.frecuencia}</td>
-                  <td style={{ padding: "12px" }}>{item.porcentaje}%</td>
+                  <td style={{ padding: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div
+                        style={{
+                          width: "100px",
+                          backgroundColor: "#e2e8f0",
+                          height: "8px",
+                          borderRadius: "4px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(item.porcentaje, 100)}%`,
+                            backgroundColor: "#2563eb",
+                            height: "100%",
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                        {item.porcentaje}%
+                      </span>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

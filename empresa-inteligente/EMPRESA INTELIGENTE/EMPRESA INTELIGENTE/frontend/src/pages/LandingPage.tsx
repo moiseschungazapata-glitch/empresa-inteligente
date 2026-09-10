@@ -1,82 +1,47 @@
 import React, { useState } from "react";
 import { supabase } from "../services/supabaseClient";
 
-export default function LandingPage() {
-  const [formData, setFormData] = useState({
-    nombre: "",
-    email: "",
-    telefono: "",
-    empresa: "",
-    comentario: "",
-  });
-  const [enviado, setEnviado] = useState(false);
-  const [cargando, setCargando] = useState(false);
+export function LandingPage() {
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [exito, setExito] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCargando(true);
+    if (!comentario.trim()) return;
 
+    setEnviando(true);
     try {
-      // 1. Guardar cliente en la tabla 'clientes'
+      // 1. Crear un cliente anónimo temporal para cumplir con la clave foránea 'cliente_id'
       const { data: cliente, error: errorCliente } = await supabase
         .from("clientes")
-        .insert([
-          {
-            cliente: formData.nombre,
-            email: formData.email,
-            telefono: formData.telefono,
-            empresa: formData.empresa,
-          },
-        ])
+        .insert([{ nombre: "Cliente Público Anónimo", email: `anon_${Date.now()}@landing.com` }])
         .select()
         .single();
 
       if (errorCliente) throw errorCliente;
 
-      // 2. Clasificación preliminar de servicio para NLP
-      let servicioDetectado = "General";
-      const texto = formData.comentario.toLowerCase();
-      if (
-        texto.includes("atención") ||
-        texto.includes("soporte") ||
-        texto.includes("ayuda")
-      ) {
-        servicioDetectado = "Atención al Cliente";
-      } else if (
-        texto.includes("precio") ||
-        texto.includes("pago") ||
-        texto.includes("cotización") ||
-        texto.includes("comprar")
-      ) {
-        servicioDetectado = "Ventas y Cotizaciones";
-      } else if (
-        texto.includes("pedido") ||
-        texto.includes("envío") ||
-        texto.includes("entrega") ||
-        texto.includes("producto")
-      ) {
-        servicioDetectado = "Logística y Productos";
-      }
-
-      // 3. Guardar comentario en la tabla 'comentarios'
-      const { error: errorComentario } = await supabase
-        .from("comentarios")
-        .insert([
-          {
-            cliente_id: cliente.id,
-            comentario: formData.comentario,
-            servicio_detectado: servicioDetectado,
-          },
-        ]);
+      // 2. Insertar el comentario usando la columna exacta 'contenido'
+      const { error: errorComentario } = await supabase.from("comentarios").insert([
+        {
+          cliente_id: cliente.id,
+          contenido: comentario,
+          canal: "Web",
+          estado: "Pendiente",
+          categoria: "Consulta",
+          procesado: false,
+        },
+      ]);
 
       if (errorComentario) throw errorComentario;
 
-      setEnviado(true);
-    } catch (error) {
-      console.error("Error al registrar solicitud:", error);
-      alert("Ocurrió un error al enviar tus datos.");
+      setExito(true);
+      setComentario("");
+    } catch (err) {
+      console.error("Error al enviar comentario:", err);
+      alert("Hubo un error al guardar tu comentario. Revisa los permisos de la base de datos.");
     } finally {
-      setCargando(false);
+      setEnviando(false);
     }
   };
 
@@ -89,7 +54,6 @@ export default function LandingPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: "24px",
-        fontFamily: "sans-serif",
       }}
     >
       <div
@@ -99,201 +63,64 @@ export default function LandingPage() {
           borderRadius: "12px",
           maxWidth: "500px",
           width: "100%",
-          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.3)",
         }}
       >
-        <h2
-          style={{
-            fontSize: "24px",
-            fontWeight: "bold",
-            marginBottom: "8px",
-            color: "#0f172a",
-          }}
-        >
-          Bienvenido a Empresa Inteligente
+        <h2 style={{ fontSize: "22px", fontWeight: "bold", color: "#0f172a", marginBottom: "8px" }}>
+          Empresa Inteligente
         </h2>
-        <p style={{ color: "#64748b", marginBottom: "24px", fontSize: "14px" }}>
-          Ingresa tus datos y déjanos tu consulta o comentario.
+        <p style={{ color: "#64748b", marginBottom: "20px", fontSize: "14px" }}>
+          Déjanos tu comentario o consulta a continuación:
         </p>
 
-        {enviado ? (
-          <div
-            style={{
-              padding: "16px",
-              backgroundColor: "#d1fae5",
-              color: "#065f46",
-              borderRadius: "8px",
-              textAlign: "center",
-              fontWeight: "600",
-            }}
-          >
-            ¡Gracias por tus datos! Tu información y comentario han sido registrados con éxito.
+        {exito ? (
+          <div style={{ padding: "16px", backgroundColor: "#d1fae5", color: "#065f46", borderRadius: "8px" }}>
+            ¡Gracias! Tu comentario ha sido enviado exitosamente.
+            <button
+              onClick={() => setExito(false)}
+              style={{
+                display: "block",
+                marginTop: "12px",
+                background: "none",
+                border: "none",
+                color: "#047857",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              Enviar otro comentario
+            </button>
           </div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#334155",
-                  marginBottom: "4px",
-                }}
-              >
-                Nombre completo *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.nombre}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#334155",
-                  marginBottom: "4px",
-                }}
-              >
-                Correo electrónico *
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#334155",
-                  marginBottom: "4px",
-                }}
-              >
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                value={formData.telefono}
-                onChange={(e) =>
-                  setFormData({ ...formData, telefono: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#334155",
-                  marginBottom: "4px",
-                }}
-              >
-                Empresa
-              </label>
-              <input
-                type="text"
-                value={formData.empresa}
-                onChange={(e) =>
-                  setFormData({ ...formData, empresa: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#334155",
-                  marginBottom: "4px",
-                }}
-              >
-                Comentario u Opinión *
-              </label>
-              <textarea
-                rows={4}
-                required
-                placeholder="Indícanos qué servicio requieres o déjanos tu consulta..."
-                value={formData.comentario}
-                onChange={(e) =>
-                  setFormData({ ...formData, comentario: e.target.value })
-                }
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={cargando}
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <textarea
+              rows={5}
+              required
+              placeholder="Escribe tu comentario aquí..."
+              value={comentario}
+              onChange={(e) => setComentario(e.target.value)}
               style={{
                 width: "100%",
+                padding: "12px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                boxSizing: "border-box",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              type="submit"
+              disabled={enviando}
+              style={{
                 padding: "12px",
                 backgroundColor: "#2563eb",
                 color: "#ffffff",
                 border: "none",
-                borderRadius: "6px",
-                fontWeight: "600",
-                fontSize: "15px",
+                borderRadius: "8px",
+                fontWeight: "bold",
                 cursor: "pointer",
               }}
             >
-              {cargando ? "Enviando..." : "Enviar Formulario"}
+              {enviando ? "Enviando..." : "Enviar comentario"}
             </button>
           </form>
         )}
@@ -301,3 +128,5 @@ export default function LandingPage() {
     </div>
   );
 }
+
+export default LandingPage;
