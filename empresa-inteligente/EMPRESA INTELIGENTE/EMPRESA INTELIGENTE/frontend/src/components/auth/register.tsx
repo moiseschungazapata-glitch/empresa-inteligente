@@ -17,7 +17,6 @@ export default function Register({ onBackToLogin }: RegisterProps) {
   const [error, setError] = useState<string | null>(null);
 
   // CONFIGURACIÓN: Ingresa tu correo o tu número de WhatsApp aquí
-  const ADMIN_EMAIL = "moiseschungazapata@gmail.com"; 
   const ADMIN_PHONE_WHATSAPP = "51903271188"; // Reemplaza con tu número (código país + número)
 
   const handleSubmit = async (e: React.FormEvent) => {
