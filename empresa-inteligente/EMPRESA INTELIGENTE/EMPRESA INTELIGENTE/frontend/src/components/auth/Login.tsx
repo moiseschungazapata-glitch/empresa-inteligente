@@ -107,8 +107,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         throw new Error(authError?.message || "Correo o contraseña incorrectos.");
       }
 
-      // 2. Cerrar sesión temporalmente para obligar completar la autenticación por factores (OTP + Biometría)
-      await supabase.auth.signOut();
+     
 
       // 3. Solicitar envío de código OTP al correo
       const { error: otpError } = await supabase.auth.signInWithOtp({
