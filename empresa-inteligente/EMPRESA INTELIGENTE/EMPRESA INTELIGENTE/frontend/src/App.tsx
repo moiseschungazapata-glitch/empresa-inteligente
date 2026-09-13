@@ -5,6 +5,7 @@ import { supabase } from "./services/supabaseClient";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/register";
 
+import LandingPage from "./pages/LandingPage";
 import AnalizarComentario from "./pages/AnalizarComentario";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
@@ -37,6 +38,11 @@ function App() {
   // Indica si estamos dentro del proceso de registro
   const [isRegistering, setIsRegistering] = useState(false);
 
+  // 1. Detectar si la URL actual corresponde a la ruta pública del cliente
+  const isLandingPath =
+    window.location.pathname === "/landing" ||
+    window.location.pathname === "/landing/";
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -51,6 +57,11 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // 2. Si el usuario ingresa a /landing, mostrar la página pública sin pasar por el Login ni la carga
+  if (isLandingPath) {
+    return <LandingPage />;
+  }
 
   if (loading) {
     return (
@@ -151,15 +162,6 @@ function App() {
         {activePage === "Reportes" && <Reportes />}
         {activePage === "Usuarios" && <Usuarios />}
         {activePage === "Auditoria" && <Auditoria />}
-
-        {activePage !== "Dashboard" &&
-          activePage !== "Clientes" &&
-          activePage !== "Comentarios" && (
-            <main className="placeholder">
-              <h1>{activePage}</h1>
-              <p>Este módulo será desarrollado en el siguiente paso.</p>
-            </main>
-          )}
       </div>
     </div>
   );
