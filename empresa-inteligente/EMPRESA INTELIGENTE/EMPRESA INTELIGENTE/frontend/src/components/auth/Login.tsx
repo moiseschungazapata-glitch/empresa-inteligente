@@ -38,6 +38,7 @@ interface LoginProps {
 type Step = "access" | "code" | "identity";
 
 export default function Login({
+  onLoginSuccess,
   onRegister,
 }: LoginProps) {
 
@@ -281,6 +282,14 @@ export default function Login({
       }
 
       setLivenessCompleted(true);
+
+      console.log(
+        "Face Liveness aprobado correctamente."
+      );
+
+      setTimeout(() => {
+        onLoginSuccess?.();
+      }, 1200);
       setVerifyingFace(false);
 
       /*

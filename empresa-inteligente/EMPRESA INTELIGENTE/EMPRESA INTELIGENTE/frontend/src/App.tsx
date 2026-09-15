@@ -25,9 +25,22 @@ import Auditoria from "./pages/Auditoria";
 
 import "./index.css";
 
+const BIOMETRIC_SESSION_KEY =
+  "empresa-inteligente-biometric-verified";
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Indica si el usuario ya superó la verificación facial
+  // durante esta sesión del navegador.
+  const [biometricVerified, setBiometricVerified] =
+    useState(
+      () =>
+        sessionStorage.getItem(
+          BIOMETRIC_SESSION_KEY
+        ) === "true"
+    );
 
   const [activePage, setActivePage] = useState("Dashboard");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -38,31 +51,64 @@ function App() {
   // Indica si estamos dentro del proceso de registro
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // 1. Detectar si la URL actual corresponde a la ruta pública del cliente
+  // Ruta pública
   const isLandingPath =
     window.location.pathname === "/landing" ||
     window.location.pathname === "/landing/";
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
+    // ----------------------------------------------------------
+    // SESIÓN INICIAL
+    // ----------------------------------------------------------
+    supabase.auth.getSession().then(
+      ({ data: { session } }) => {
+        setSession(session);
 
+        // Si no existe sesión, tampoco puede existir
+        // una verificación biométrica válida.
+        if (!session) {
+          sessionStorage.removeItem(
+            BIOMETRIC_SESSION_KEY
+          );
+          setBiometricVerified(false);
+        }
+
+        setLoading(false);
+      }
+    );
+
+    // ----------------------------------------------------------
+    // CAMBIOS DE AUTENTICACIÓN
+    // ----------------------------------------------------------
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+
+        if (!session) {
+          sessionStorage.removeItem(
+            BIOMETRIC_SESSION_KEY
+          );
+
+          setBiometricVerified(false);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // 2. Si el usuario ingresa a /landing, mostrar la página pública sin pasar por el Login ni la carga
+  // ----------------------------------------------------------
+  // RUTA PÚBLICA
+  // ----------------------------------------------------------
   if (isLandingPath) {
     return <LandingPage />;
   }
 
+  // ----------------------------------------------------------
+  // CARGANDO
+  // ----------------------------------------------------------
   if (loading) {
     return (
       <div
@@ -75,18 +121,28 @@ function App() {
           color: "white",
         }}
       >
-        <h2>Cargando Empresa Inteligente...</h2>
+        <h2>
+          Cargando Empresa Inteligente...
+        </h2>
       </div>
     );
   }
 
-  // Si está registrándose, mostrar SIEMPRE el registro
+  // ----------------------------------------------------------
+  // REGISTRO
+  // ----------------------------------------------------------
   if (showRegister || isRegistering) {
     return (
       <Register
         onBackToLogin={async () => {
           setIsRegistering(false);
           setShowRegister(false);
+
+          sessionStorage.removeItem(
+            BIOMETRIC_SESSION_KEY
+          );
+
+          setBiometricVerified(false);
 
           await supabase.auth.signOut();
           setSession(null);
@@ -95,11 +151,27 @@ function App() {
     );
   }
 
-  // Si no hay sesión, mostrar Login
-  if (!session) {
+  // ----------------------------------------------------------
+  // LOGIN
+  //
+  // IMPORTANTE:
+  // Una sesión de Supabase NO es suficiente.
+  //
+  // Necesitamos también:
+  //
+  // biometricVerified === true
+  // ----------------------------------------------------------
+  if (!session || !biometricVerified) {
     return (
       <Login
-        onLoginSuccess={() => window.location.reload()}
+        onLoginSuccess={() => {
+          sessionStorage.setItem(
+            BIOMETRIC_SESSION_KEY,
+            "true"
+          );
+
+          setBiometricVerified(true);
+        }}
         onRegister={() => {
           setShowRegister(true);
           setIsRegistering(true);
@@ -108,6 +180,9 @@ function App() {
     );
   }
 
+  // ----------------------------------------------------------
+  // DASHBOARD
+  // ----------------------------------------------------------
   return (
     <div className="app">
       <Sidebar
@@ -120,7 +195,9 @@ function App() {
       <div className="content">
         <div className="mobile-topbar">
           <button
-            onClick={() => setIsMobileOpen(true)}
+            onClick={() =>
+              setIsMobileOpen(true)
+            }
             style={{
               background: "none",
               border: "none",
@@ -147,21 +224,65 @@ function App() {
           <div style={{ width: "24px" }} />
         </div>
 
-        {activePage === "Dashboard" && <Dashboard />}
-        {activePage === "Clientes" && <Clientes />}
-        {activePage === "Comentarios" && <Comentarios />}
-        {activePage === "Solicitudes" && <Solicitudes />}
-        {activePage === "Tiempos de atención" && <TiemposAtencion />}
-        {activePage === "Analizar comentario" && <AnalizarComentario />}
-        {activePage === "Palabras frecuentes" && <PalabrasFrecuentes />}
-        {activePage === "Categorías" && <Categorias />}
-        {activePage === "Clasificación" && <Clasificacion />}
-        {activePage === "Estadísticas" && <Estadisticas />}
-        {activePage === "Interpolación" && <Interpolacion />}
-        {activePage === "Optimización" && <Optimizacion />}
-        {activePage === "Reportes" && <Reportes />}
-        {activePage === "Usuarios" && <Usuarios />}
-        {activePage === "Auditoria" && <Auditoria />}
+        {activePage === "Dashboard" && (
+          <Dashboard />
+        )}
+
+        {activePage === "Clientes" && (
+          <Clientes />
+        )}
+
+        {activePage === "Comentarios" && (
+          <Comentarios />
+        )}
+
+        {activePage === "Solicitudes" && (
+          <Solicitudes />
+        )}
+
+        {activePage === "Tiempos de atención" && (
+          <TiemposAtencion />
+        )}
+
+        {activePage === "Analizar comentario" && (
+          <AnalizarComentario />
+        )}
+
+        {activePage === "Palabras frecuentes" && (
+          <PalabrasFrecuentes />
+        )}
+
+        {activePage === "Categorías" && (
+          <Categorias />
+        )}
+
+        {activePage === "Clasificación" && (
+          <Clasificacion />
+        )}
+
+        {activePage === "Estadísticas" && (
+          <Estadisticas />
+        )}
+
+        {activePage === "Interpolación" && (
+          <Interpolacion />
+        )}
+
+        {activePage === "Optimización" && (
+          <Optimizacion />
+        )}
+
+        {activePage === "Reportes" && (
+          <Reportes />
+        )}
+
+        {activePage === "Usuarios" && (
+          <Usuarios />
+        )}
+
+        {activePage === "Auditoria" && (
+          <Auditoria />
+        )}
       </div>
     </div>
   );
