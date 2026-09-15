@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useRef,
   useState,
   type FormEvent,
   type CSSProperties,
@@ -8,6 +7,8 @@ import {
 } from "react";
 
 import { createClient } from "@supabase/supabase-js";
+import { FaceLivenessDetector } from "@aws-amplify/ui-react-liveness";
+import "@aws-amplify/ui-react/styles.css";
 import { supabase } from "../../services/supabaseClient";
 
 // ============================================================
@@ -37,7 +38,6 @@ interface LoginProps {
 type Step = "access" | "code" | "identity";
 
 export default function Login({
-  onLoginSuccess,
   onRegister,
 }: LoginProps) {
 
@@ -57,8 +57,18 @@ export default function Login({
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
-  const [cameraActive, setCameraActive] = useState(false);
-  const [verifyingFace, setVerifyingFace] = useState(false);
+  // Amazon Rekognition Face Liveness
+  const [livenessSessionId, setLivenessSessionId] =
+    useState<string | null>(null);
+  const [livenessLoading, setLivenessLoading] =
+    useState(false);
+  const [livenessCompleted, setLivenessCompleted] =
+    useState(false);
+
+  // Se conserva para animar el personaje del panel izquierdo
+  // durante la verificación facial.
+  const [verifyingFace, setVerifyingFace] =
+    useState(false);
 
   const [activeField, setActiveField] = useState<
     "email" | "password" | null
@@ -69,8 +79,6 @@ export default function Login({
     x: 0,
     y: 0,
   });
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // ============================================================
   // OJOS SIGUEN EL CURSOR
@@ -127,60 +135,199 @@ export default function Login({
   }, [step, resendTimer]);
 
   // ============================================================
-  // CÁMARA
+  // AMAZON REKOGNITION - FACE LIVENESS
   // ============================================================
 
-  useEffect(() => {
-    if (step === "identity") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
+  // El componente de AWS maneja la cámara y el streaming.
+  // Aquí solo creamos la sesión desde nuestro backend seguro.
+  const createLivenessSession = async () => {
+    if (livenessLoading) return;
 
-    return () => {
-      stopCamera();
-    };
-  }, [step]);
+    setLivenessLoading(true);
+    setVerifyingFace(true);
+    setError(null);
+    setLivenessCompleted(false);
 
-  const startCamera = async () => {
     try {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: 400,
-            height: 300,
-          },
-        });
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setCameraActive(true);
+      if (!session?.access_token) {
+        throw new Error(
+          "La sesión de usuario no está disponible."
+        );
       }
-    } catch (err) {
+
+      const { data, error: functionError } =
+        await supabase.functions.invoke(
+          "create-face-liveness-session",
+          {
+            body: {},
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+      if (functionError) {
+        console.error(
+          "Error en create-face-liveness-session:",
+          functionError
+        );
+
+        throw new Error(
+          "No se pudo iniciar la verificación facial."
+        );
+      }
+
+      if (!data?.sessionId) {
+        throw new Error(
+          "Amazon Rekognition no devolvió un SessionId válido."
+        );
+      }
+
+      console.info(
+        "Sesión Face Liveness creada correctamente."
+      );
+
+      setLivenessSessionId(data.sessionId);
+    } catch (err: unknown) {
       console.error(
-        "Error al acceder a la cámara:",
+        "Error creando sesión Face Liveness:",
         err
       );
 
+      setVerifyingFace(false);
+      setLivenessSessionId(null);
+
       setError(
-        "No se pudo acceder a la cámara. Asegúrate de permitir el acceso en el navegador."
+        err instanceof Error
+          ? err.message
+          : "No se pudo iniciar la verificación facial."
       );
+    } finally {
+      setLivenessLoading(false);
     }
   };
 
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const stream =
-        videoRef.current.srcObject as MediaStream;
+  // AWS llama este callback cuando termina la prueba de vida.
+  // Consultamos el resultado real desde nuestra Edge Function.
+  const handleLivenessComplete = async () => {
+    if (!livenessSessionId) {
+      setVerifyingFace(false);
+      setError(
+        "No existe una sesión de verificación facial."
+      );
+      return;
+    }
 
-      stream
-        .getTracks()
-        .forEach((track) => track.stop());
+    setLivenessLoading(true);
+    setError(null);
 
-      videoRef.current.srcObject = null;
-      setCameraActive(false);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error(
+          "La sesión de usuario no está disponible."
+        );
+      }
+
+      const { data, error: functionError } =
+        await supabase.functions.invoke(
+          "get-face-liveness-session-results",
+          {
+            body: {
+              sessionId: livenessSessionId,
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+      if (functionError) {
+        console.error(
+          "Error obteniendo resultado Face Liveness:",
+          functionError
+        );
+
+        throw new Error(
+          "No se pudo obtener el resultado de la verificación facial."
+        );
+      }
+
+      console.info(
+        "Resultado Face Liveness:",
+        data
+      );
+
+      if (data?.status !== "SUCCEEDED") {
+        throw new Error(
+          "La prueba de vida facial no fue aprobada."
+        );
+      }
+
+      if (
+        typeof data.confidence !== "number" ||
+        data.confidence < 90
+      ) {
+        throw new Error(
+          "La confianza de la prueba de vida no alcanzó el nivel requerido."
+        );
+      }
+
+      setLivenessCompleted(true);
+      setVerifyingFace(false);
+
+      /*
+       * IMPORTANTE:
+       * Face Liveness confirma que existe una persona real.
+       * Todavía NO concedemos acceso al Dashboard.
+       *
+       * El siguiente paso del proyecto será utilizar la
+       * ReferenceImage para comparar el rostro actual contra
+       * el empleado registrado en la colección de Rekognition.
+       */
+
+      console.info(
+        `Face Liveness aprobado con confianza ${data.confidence}.`
+      );
+    } catch (err: unknown) {
+      console.error(
+        "Error en Face Liveness:",
+        err
+      );
+
+      setVerifyingFace(false);
+      setLivenessSessionId(null);
+      setLivenessCompleted(false);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "La verificación facial no pudo completarse."
+      );
+    } finally {
+      setLivenessLoading(false);
     }
   };
+
+  // ============================================================
+  // LIMPIEZA DEL ESTADO DE LIVENESS
+  // ============================================================
+
+  useEffect(() => {
+    if (step !== "identity") {
+      setLivenessSessionId(null);
+      setLivenessLoading(false);
+      setLivenessCompleted(false);
+      setVerifyingFace(false);
+    }
+  }, [step]);
 
   // ============================================================
   // PASO 1
@@ -338,6 +485,11 @@ export default function Login({
         );
       }
 
+      setLivenessSessionId(null);
+      setLivenessLoading(false);
+      setLivenessCompleted(false);
+      setVerifyingFace(false);
+
       setStep("identity");
 
     } catch (err: any) {
@@ -355,22 +507,6 @@ export default function Login({
   // PASO 3
   // VERIFICACIÓN FACIAL
   // ============================================================
-
-  const handleVerifyFace = () => {
-    setVerifyingFace(true);
-    setError(null);
-
-    setTimeout(() => {
-      setVerifyingFace(false);
-      stopCamera();
-
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      } else {
-        window.location.reload();
-      }
-    }, 2500);
-  };
 
   // ============================================================
   // ESTILOS DEL PERSONAJE
@@ -2560,7 +2696,6 @@ export default function Login({
 
             {step === "identity" && (
               <>
-
                 <div className="step-header">
 
                   <div className="step-dot active" />
@@ -2584,8 +2719,8 @@ export default function Login({
                 </h1>
 
                 <p className="form-description">
-                  Colócate frente a la cámara y
-                  mantén tu rostro dentro del marco.
+                  Completa la prueba de vida facial
+                  para continuar con la verificación.
                 </p>
 
                 {error && (
@@ -2594,75 +2729,201 @@ export default function Login({
                   </div>
                 )}
 
-                <div className="camera-box">
+                {/* Pantalla inicial */}
+                {!livenessSessionId &&
+                  !livenessCompleted && (
+                    <div className="camera-box">
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          minHeight: "260px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexDirection: "column",
+                          textAlign: "center",
+                          padding: "28px",
+                          color: "white",
+                          background:
+                            "radial-gradient(circle at 50% 40%, #162033 0%, #050608 70%)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "48px",
+                            marginBottom: "14px",
+                          }}
+                        >
+                          🔐
+                        </div>
 
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="camera-video"
-                  />
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 800,
+                            marginBottom: "8px",
+                          }}
+                        >
+                          Verificación facial segura
+                        </div>
 
-                  {cameraActive && (
-                    <div className="camera-overlay">
-
-                      <div className="face-frame">
-
-                        <div className="scan-line" />
-
+                        <div
+                          style={{
+                            maxWidth: "330px",
+                            color: "#94a3b8",
+                            fontSize: "12px",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          Utilizaremos tu cámara para
+                          realizar una prueba de vida y
+                          comprobar que hay una persona
+                          real frente al dispositivo.
+                        </div>
                       </div>
-
                     </div>
                   )}
 
-                  {!cameraActive && (
-                    <div className="camera-message">
-                      Activando cámara segura...
+                {/* Face Liveness real de AWS */}
+                {livenessSessionId &&
+                  !livenessCompleted && (
+                    <div
+                      style={{
+                        width: "100%",
+                        marginBottom: "20px",
+                        borderRadius: "18px",
+                        overflow: "hidden",
+                        border: "1px solid #1e293b",
+                        background: "#050608",
+                      }}
+                    >
+                      <FaceLivenessDetector
+                        sessionId={livenessSessionId}
+                        region="us-east-1"
+                        onAnalysisComplete={
+                          handleLivenessComplete
+                        }
+                        onError={(livenessError) => {
+                          console.error(
+                            "Error de Face Liveness:",
+                            livenessError
+                          );
+
+                          setLivenessSessionId(null);
+                          setLivenessCompleted(false);
+                          setVerifyingFace(false);
+
+                          setError(
+                            "No se pudo completar la prueba de vida. Inténtalo nuevamente."
+                          );
+                        }}
+                      />
                     </div>
                   )}
 
-                  {verifyingFace && (
-                    <div className="verify-overlay">
-
-                      <div className="verify-ring" />
-
-                      Analizando identidad...
-
+                {/* Resultado de Liveness */}
+                {livenessCompleted && (
+                  <div
+                    style={{
+                      width: "100%",
+                      minHeight: "180px",
+                      borderRadius: "18px",
+                      marginBottom: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexDirection: "column",
+                      textAlign: "center",
+                      padding: "24px",
+                      background:
+                        "linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%)",
+                      border:
+                        "1px solid #bbf7d0",
+                      color: "#166534",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "42px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      ✓
                     </div>
+
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 800,
+                        marginBottom: "6px",
+                      }}
+                    >
+                      Prueba de vida aprobada
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#64748b",
+                        lineHeight: 1.5,
+                        maxWidth: "320px",
+                      }}
+                    >
+                      Se confirmó que hay una persona real.
+                      La identificación facial del empleado
+                      se completará en el siguiente paso.
+                    </div>
+                  </div>
+                )}
+
+                {/* Iniciar / repetir Liveness */}
+                {!livenessSessionId &&
+                  !livenessCompleted && (
+                    <button
+                      type="button"
+                      disabled={livenessLoading}
+                      onClick={createLivenessSession}
+                      className="main-button"
+                      style={{
+                        ...buttonStyle,
+                        opacity:
+                          livenessLoading
+                            ? 0.55
+                            : 1,
+                      }}
+                    >
+                      {livenessLoading
+                        ? "Preparando cámara..."
+                        : "Iniciar verificación facial →"}
+                    </button>
                   )}
 
-                </div>
-
-                <button
-                  type="button"
-                  disabled={
-                    verifyingFace ||
-                    !cameraActive
-                  }
-                  onClick={
-                    handleVerifyFace
-                  }
-                  className="main-button"
-                  style={{
-                    ...buttonStyle,
-                    opacity:
-                      verifyingFace ||
-                      !cameraActive
-                        ? 0.55
-                        : 1,
-                  }}
-                >
-                  {verifyingFace
-                    ? "Analizando rostro..."
-                    : "Validar identidad →"}
-                </button>
+                {livenessCompleted && (
+                  <button
+                    type="button"
+                    disabled={true}
+                    className="main-button"
+                    style={{
+                      ...buttonStyle,
+                      background: "#16a34a",
+                      opacity: 0.75,
+                      cursor: "default",
+                    }}
+                  >
+                    Prueba de vida completada ✓
+                  </button>
+                )}
 
                 <button
                   type="button"
                   className="back-button"
+                  disabled={livenessLoading}
                   onClick={() => {
-                    stopCamera();
+                    setLivenessSessionId(null);
+                    setLivenessLoading(false);
+                    setLivenessCompleted(false);
+                    setVerifyingFace(false);
                     setStep("code");
                     setError(null);
                   }}
