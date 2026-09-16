@@ -24,6 +24,7 @@ import Usuarios from "./pages/Usuarios";
 import Auditoria from "./pages/Auditoria";
 
 import "./index.css";
+import "./workspace.css";
 
 const BIOMETRIC_SESSION_KEY =
   "empresa-inteligente-biometric-verified";
@@ -44,6 +45,7 @@ function App() {
 
   const [activePage, setActivePage] = useState("Dashboard");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Controla Login / Registro
   const [showRegister, setShowRegister] = useState(false);
@@ -184,8 +186,10 @@ function App() {
   // DASHBOARD
   // ----------------------------------------------------------
   return (
-    <div className="app">
+    <div className={"app " + (collapsed ? "sidebar-collapsed" : "")}>
       <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed(!collapsed)}
         activePage={activePage}
         setActivePage={setActivePage}
         isOpen={isMobileOpen}
@@ -193,36 +197,11 @@ function App() {
       />
 
       <div className="content">
-        <div className="mobile-topbar">
-          <button
-            onClick={() =>
-              setIsMobileOpen(true)
-            }
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "24px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              color: "#0f172a",
-            }}
-          >
-            ☰
-          </button>
-
-          <span
-            style={{
-              fontWeight: "700",
-              color: "#1e293b",
-              fontSize: "16px",
-            }}
-          >
-            Empresa Inteligente
-          </span>
-
-          <div style={{ width: "24px" }} />
-        </div>
+        <header className="workspace-topbar">
+          <button className="icon-button mobile-menu-toggle" aria-label="Abrir menú" onClick={() => setIsMobileOpen(true)}>☰</button>
+          <span>Empresa Inteligente <span className="breadcrumb-divider">/</span> <strong>{activePage}</strong></span>
+          <span className="workspace-label">ESPACIO DE TRABAJO</span>
+        </header>
 
         {activePage === "Dashboard" && (
           <Dashboard />
@@ -252,7 +231,7 @@ function App() {
           <PalabrasFrecuentes />
         )}
 
-        {activePage === "Categorías" && (
+        {(activePage === "Categorías" || activePage === "Categorías Sistema" || activePage === "Categorías NLP") && (
           <Categorias />
         )}
 

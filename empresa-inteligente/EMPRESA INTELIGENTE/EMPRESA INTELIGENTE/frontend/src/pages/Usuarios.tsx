@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import Modal from "../components/Modal";
 import RegistroRostro from "../components/auth/RegistroRostro";
 
 interface Usuario {
@@ -18,6 +19,10 @@ function Usuarios() {
   const [creando, setCreando] = useState(false);
   const [registroFacial, setRegistroFacial] = useState<{ nombre: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState("");
 
   // Formulario
   const [nombre, setNombre] = useState("");
@@ -41,7 +46,7 @@ function Usuarios() {
     if (error) {
       setError(error.message);
     } else {
-  console.log("USUARIOS RECIBIDOS:", data);
+
   setUsuarios(data || []);
 }
 
@@ -131,7 +136,7 @@ function Usuarios() {
 
       await obtenerUsuarios();
 
-      if (!registrarRostro) alert("Usuario creado correctamente.");
+      if (!registrarRostro) { setFormOpen(false); setMessage("Usuario creado correctamente."); }
     } catch (error) {
       console.error(error);
       alert("Ocurrió un error al crear el usuario.");
@@ -165,232 +170,41 @@ function Usuarios() {
     );
   };
 
-  // ==============================
-  // ESTADOS DE CARGA
-  // ==============================
-  if (loading) {
-    return (
-      <main className="dashboard">
-        <p className="loading">
-          Cargando usuarios...
-        </p>
-      </main>
-    );
-  }
-
-  if (error) {
-    return (
-      <main className="dashboard">
-        <p className="error">
-          Error: {error}
-        </p>
-      </main>
-    );
-  }
-
-  // ==============================
-  // INTERFAZ
-  // ==============================
-  return (
-    <main className="dashboard">
-
-      <div className="topbar">
-        <div>
-          <h1>Gestión de Usuarios</h1>
-          <p>
-            Administra los trabajadores que pueden ingresar al sistema.
-          </p>
-        </div>
+  const visibles = usuarios.filter(u => (u.nombre + " " + u.email + " " + u.rol).toLowerCase().includes(search.toLowerCase()));
+  const closeForm = () => { setFormOpen(false); setRegistroFacial(null); setPassword(""); setConfirmPassword(""); };
+  return <main className="dashboard users-page">
+    <header className="users-heading"><div><span className="eyebrow">CONFIGURACIÓN / EQUIPO</span><h1>Gestión de usuarios</h1><p>Administra tu equipo y sus accesos a la plataforma.</p></div>
+      <button className="btn-primary" onClick={() => setFormOpen(true)}><span aria-hidden="true">＋</span> Nuevo usuario</button>
+    </header>
+    {message && <p role="status" className="success-message">{message}</p>}
+    <section className="panel users-list">
+      <div className="users-toolbar"><div><h2>Usuarios del equipo <span className="count-badge">{usuarios.length}</span></h2><p>Personas registradas en tu organización</p></div>
+        <label className="user-search"><span aria-hidden="true">⌕</span><input aria-label="Buscar usuarios" placeholder="Buscar por nombre, correo o rol…" value={search} onChange={e => setSearch(e.target.value)} /></label>
       </div>
-
-      {/* ==============================
-          FORMULARIO
-      ============================== */}
-
-      <section className="panel">
-
-        <div className="panel-header">
-          <h3>Registrar nuevo trabajador</h3>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="form-grid"
-        >
-          <fieldset disabled={creando || registroFacial !== null} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-
-          <input
-            type="text"
-            placeholder="Nombre completo"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-          />
-
-          <input
-            type="email"
-            placeholder="Correo electrónico"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Confirmar contraseña"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-
-          <select
-            value={rol}
-            onChange={(e) => setRol(e.target.value)}
-          >
-            <option value="Administrador">
-              Administrador
-            </option>
-
-            <option value="Analista">
-              Analista
-            </option>
-
-            <option value="Supervisor">
-              Supervisor
-            </option>
-          </select>
-
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={creando}
-          >
-            {creando
-              ? "Creando usuario..."
-              : "Crear usuario"}
-          </button>
-
-          <button type="submit" name="accion" value="rostro" className="btn-primary" disabled={creando}>
-            Crear usuario y registrar rostro
-          </button>
-          <p>Para registrar el rostro, el trabajador debe estar presente y tener acceso a su correo.</p>
-          </fieldset>
-
-        </form>
-
-      </section>
-
-      {registroFacial && <RegistroRostro {...registroFacial} onClose={() => setRegistroFacial(null)} />}
-
-      {/* ==============================
-          TABLA
-      ============================== */}
-
-      <section className="panel">
-
-        <div className="panel-header">
-          <h3>
-            Usuarios registrados ({usuarios.length})
-          </h3>
-        </div>
-
-        <div className="clientes-table">
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              {usuarios.length === 0 ? (
-
-                <tr>
-                  <td colSpan={6}>
-                    No hay usuarios registrados.
-                  </td>
-                </tr>
-
-              ) : (
-
-                usuarios.map((usuario) => (
-
-                  <tr key={usuario.id}>
-
-                    <td>
-                      {usuario.id}
-                    </td>
-
-                    <td>
-                      {usuario.nombre}
-                    </td>
-
-                    <td>
-                      {usuario.email}
-                    </td>
-
-                    <td>
-                      {usuario.rol}
-                    </td>
-
-                    <td>
-
-                      <span
-                        className={`badge ${
-                          usuario.activo
-                            ? "activo"
-                            : "inactivo"
-                        }`}
-                      >
-                        {usuario.activo
-                          ? "Activo"
-                          : "Inactivo"}
-                      </span>
-
-                    </td>
-
-                    <td>
-
-                      <button
-                        onClick={() =>
-                          eliminarUsuario(usuario.id)
-                        }
-                        className="btn-danger"
-                      >
-                        Eliminar
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                ))
-
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </section>
-
-    </main>
-  );
+      {error && <p role="alert" className="inline-error">No se pudo cargar la lista: {error} <button className="btn-secondary" onClick={obtenerUsuarios}>Reintentar</button></p>}
+      <div className="users-table-wrap"><table><thead><tr><th>Usuario</th><th>Correo electrónico</th><th>Rol</th><th>Estado</th><th className="align-right">Acciones</th></tr></thead>
+        <tbody>{loading ? <tr><td colSpan={5} className="table-empty">Cargando usuarios…</td></tr> : visibles.length === 0 ? <tr><td colSpan={5} className="table-empty">{search ? "No hay usuarios que coincidan con tu búsqueda." : "Aún no hay usuarios registrados."}</td></tr> : visibles.map(u => <tr key={u.id}>
+          <td><div className="table-person"><span className="table-avatar">{u.nombre.split(/\s+/).slice(0, 2).map(n => n[0]).join("").toUpperCase()}</span><div><strong>{u.nombre}</strong><small>ID {String(u.id).padStart(3, "0")}</small></div></div></td>
+          <td>{u.email}</td><td><span className="role-badge">{u.rol}</span></td><td><span className={"status-badge " + (u.activo ? "is-active" : "")}><span />{u.activo ? "Activo" : "Inactivo"}</span></td>
+          <td className="align-right"><button className="btn-danger" aria-label={"Eliminar a " + u.nombre} onClick={() => eliminarUsuario(u.id)}>Eliminar</button></td>
+        </tr>)}</tbody></table></div>
+      <footer className="users-list-footer">{visibles.length} de {usuarios.length} usuarios</footer>
+    </section>
+    {formOpen && <Modal title={registroFacial ? "Registro facial" : "Nuevo trabajador"} busy={creando || registroFacial !== null} onClose={closeForm}>
+      {registroFacial ? <RegistroRostro {...registroFacial} onClose={closeForm} /> : <form onSubmit={handleSubmit}>
+        <p className="form-intro">Completa los datos del trabajador y asigna su rol de acceso.</p>
+        <fieldset className="user-form-fields" disabled={creando}>
+          <label className="field-label full-width">Nombre completo<input autoFocus required value={nombre} autoComplete="name" placeholder="Ej. Ana García López" onChange={e => setNombre(e.target.value)} /></label>
+          <label className="field-label full-width">Correo electrónico<input required type="email" autoComplete="email" value={email} placeholder="nombre@empresa.com" onChange={e => setEmail(e.target.value)} /></label>
+          <label className="field-label">Contraseña<input required minLength={6} type="password" autoComplete="new-password" value={password} placeholder="Mínimo 6 caracteres" onChange={e => setPassword(e.target.value)} /></label>
+          <label className="field-label">Confirmar contraseña<input required minLength={6} type="password" autoComplete="new-password" value={confirmPassword} placeholder="Repite la contraseña" onChange={e => setConfirmPassword(e.target.value)} /></label>
+          <label className="field-label full-width">Rol de acceso<select value={rol} onChange={e => setRol(e.target.value)}><option>Analista</option><option>Administrador</option><option>Supervisor</option></select></label>
+          <div className="enrollment-note full-width"><strong>Registro facial</strong><p>Para registrar el rostro ahora, el trabajador debe estar presente y tener acceso a su correo y a la cámara.</p></div>
+        </fieldset>
+        <div className="modal-actions"><button type="button" className="btn-secondary" disabled={creando} onClick={closeForm}>Cancelar</button><button type="submit" className="btn-secondary" disabled={creando}>Solo crear usuario</button><button type="submit" name="accion" value="rostro" className="btn-primary" disabled={creando}>{creando ? "Creando…" : "Crear y registrar rostro"}</button></div>
+      </form>}
+    </Modal>}
+  </main>;
 }
 
 export default Usuarios;
-

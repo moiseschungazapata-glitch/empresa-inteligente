@@ -1,6 +1,12 @@
 import { useState, type ReactNode } from "react";
 
+import Perfil from "./Perfil";
+
+const Icon = ({ children }: { children: ReactNode }) => <span className="menu-icon">{children}</span>;
+
 interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
   activePage: string;
   setActivePage: (page: string) => void;
   isOpen: boolean;
@@ -8,6 +14,8 @@ interface SidebarProps {
 }
 
 function Sidebar({
+  collapsed,
+  onToggle,
   activePage,
   setActivePage,
   isOpen,
@@ -16,7 +24,8 @@ function Sidebar({
   const [openMenu, setOpenMenu] = useState<string | null>(null);
 
   const toggleMenu = (menu: string) => {
-    setOpenMenu(openMenu === menu ? null : menu);
+    if (collapsed) onToggle();
+    setOpenMenu(collapsed ? menu : openMenu === menu ? null : menu);
   };
 
   const handleSelectPage = (page: string) => {
@@ -24,9 +33,6 @@ function Sidebar({
     setIsOpen(false);
   };
 
-  const Icon = ({ children }: { children: ReactNode }) => (
-    <span className="menu-icon">{children}</span>
-  );
 
   return (
     <>
@@ -40,7 +46,7 @@ function Sidebar({
       <aside className={`sidebar ${isOpen ? "mobile-open" : ""}`}>
 
         {/* LOGO */}
-        <div className="logo">
+        <div className="sidebar-heading"><div className="logo">
           <div className="logo-icon">
             EI
           </div>
@@ -51,6 +57,8 @@ function Sidebar({
           </div>
         </div>
 
+        <button className="icon-button sidebar-toggle" aria-label={isOpen || !collapsed ? "Ocultar menú" : "Expandir menú"} title={isOpen || !collapsed ? "Ocultar menú" : "Expandir menú"} aria-expanded={isOpen || !collapsed} onClick={() => { if (isOpen) setIsOpen(false); else onToggle(); }}>☰</button>
+        </div>
         {/* NAVEGACIÓN */}
         <nav className="sidebar-nav">
 
@@ -63,7 +71,7 @@ function Sidebar({
             className={`menu-item ${
               activePage === "Dashboard" ? "active" : ""
             }`}
-            onClick={() => handleSelectPage("Dashboard")}
+            title="Dashboard" onClick={() => handleSelectPage("Dashboard")}
           >
             <Icon>
               <svg viewBox="0 0 24 24">
@@ -82,7 +90,7 @@ function Sidebar({
             className={`menu-item ${
               activePage === "Clientes" ? "active" : ""
             }`}
-            onClick={() => handleSelectPage("Clientes")}
+            title="Clientes" onClick={() => handleSelectPage("Clientes")}
           >
             <Icon>
               <svg viewBox="0 0 24 24">
@@ -105,6 +113,7 @@ function Sidebar({
             className={`menu-item ${
               openMenu === "atencion" ? "expanded" : ""
             }`}
+            title="Atención" aria-expanded={openMenu === "atencion"}
             onClick={() => toggleMenu("atencion")}
           >
             <Icon>
@@ -166,6 +175,7 @@ function Sidebar({
             className={`menu-item ${
               openMenu === "nlp" ? "expanded" : ""
             }`}
+            title="Inteligencia NLP" aria-expanded={openMenu === "nlp"}
             onClick={() => toggleMenu("nlp")}
           >
             <Icon>
@@ -244,6 +254,7 @@ function Sidebar({
             className={`menu-item ${
               openMenu === "scientific" ? "expanded" : ""
             }`}
+            title="Scientific Data" aria-expanded={openMenu === "scientific"}
             onClick={() => toggleMenu("scientific")}
           >
             <Icon>
@@ -307,7 +318,7 @@ function Sidebar({
             className={`menu-item ${
               activePage === "Reportes" ? "active" : ""
             }`}
-            onClick={() => handleSelectPage("Reportes")}
+            title="Reportes" onClick={() => handleSelectPage("Reportes")}
           >
             <Icon>
               <svg viewBox="0 0 24 24">
@@ -331,6 +342,7 @@ function Sidebar({
             className={`menu-item ${
               openMenu === "config" ? "expanded" : ""
             }`}
+            title="Configuración" aria-expanded={openMenu === "config"}
             onClick={() => toggleMenu("config")}
           >
             <Icon>
@@ -385,21 +397,7 @@ function Sidebar({
         </nav>
 
         {/* USUARIO */}
-        <div className="sidebar-user">
-
-          <div className="avatar">
-            M
-            <span className="user-status" />
-          </div>
-
-          <div className="sidebar-user-info">
-            <strong>Moisés Chunga</strong>
-            <small>Administrador</small>
-          </div>
-
-          <span className="user-more">•••</span>
-
-        </div>
+        <Perfil />
 
       </aside>
     </>
