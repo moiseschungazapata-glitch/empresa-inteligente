@@ -66,6 +66,10 @@ export default function Login({
   const [livenessCompleted, setLivenessCompleted] =
     useState(false);
 
+  const [identityResult, setIdentityResult] = useState<
+    "enrolled" | "verified" | null
+  >(null);
+
   // Se conserva para animar el personaje del panel izquierdo
   // durante la verificación facial.
   const [verifyingFace, setVerifyingFace] =
@@ -148,6 +152,7 @@ export default function Login({
     setVerifyingFace(true);
     setError(null);
     setLivenessCompleted(false);
+    setIdentityResult(null);
 
     try {
       const {
@@ -212,8 +217,41 @@ export default function Login({
     }
   };
 
-  // AWS llama este callback cuando termina la prueba de vida.
-  // Consultamos el resultado real desde nuestra Edge Function.
+  // Lee el cuerpo JSON devuelto por una Edge Function cuando
+  // Supabase responde con un error HTTP (403, 409, etc.).
+  const readFunctionErrorBody = async (
+    functionError: unknown
+  ): Promise<Record<string, unknown> | null> => {
+    try {
+      if (
+        typeof functionError !== "object" ||
+        functionError === null ||
+        !("context" in functionError)
+      ) {
+        return null;
+      }
+
+      const context = (
+        functionError as { context?: Response }
+      ).context;
+
+      if (!context) {
+        return null;
+      }
+
+      return (await context.clone().json()) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      return null;
+    }
+  };
+
+  // AWS llama este callback cuando termina la captura de Face Liveness.
+  // Aquí hacemos la autorización facial real:
+  // 1) si el usuario ya tiene rostro -> verify-face
+  // 2) si todavía no tiene rostro -> enroll-face
   const handleLivenessComplete = async () => {
     if (!livenessSessionId) {
       setVerifyingFace(false);
@@ -225,6 +263,7 @@ export default function Login({
 
     setLivenessLoading(true);
     setError(null);
+    setIdentityResult(null);
 
     try {
       const {
@@ -237,83 +276,187 @@ export default function Login({
         );
       }
 
-      const { data, error: functionError } =
-        await supabase.functions.invoke(
-          "get-face-liveness-session-results",
-          {
+      const invokeFaceFunction = async (
+        functionName: "verify-face" | "enroll-face"
+      ) => {
+        const { data, error: functionError } =
+          await supabase.functions.invoke(functionName, {
             body: {
               sessionId: livenessSessionId,
             },
             headers: {
               Authorization: `Bearer ${session.access_token}`,
             },
-          }
+          });
+
+        if (!functionError) {
+          return {
+            data: data as Record<string, unknown> | null,
+            status: 200,
+            error: null as unknown,
+          };
+        }
+
+        const errorBody =
+          await readFunctionErrorBody(functionError);
+
+        let status = 0;
+
+        if (
+          typeof functionError === "object" &&
+          functionError !== null &&
+          "context" in functionError
+        ) {
+          const context = (
+            functionError as { context?: Response }
+          ).context;
+
+          status = context?.status ?? 0;
+        }
+
+        return {
+          data:
+            errorBody ??
+            (data as Record<string, unknown> | null),
+          status,
+          error: functionError,
+        };
+      };
+
+      // ----------------------------------------------------------
+      // PRIMERO INTENTAMOS VERIFICAR EL ROSTRO
+      // ----------------------------------------------------------
+
+      const verifyResult =
+        await invokeFaceFunction("verify-face");
+
+      const verifyCode =
+        typeof verifyResult.data?.code === "string"
+          ? verifyResult.data.code
+          : null;
+
+      // ----------------------------------------------------------
+      // PRIMER ACCESO: EL USUARIO AÚN NO TIENE ROSTRO REGISTRADO
+      // ----------------------------------------------------------
+
+      if (verifyCode === "FACE_NOT_ENROLLED") {
+        console.info(
+          "El usuario todavía no tiene rostro. Iniciando registro facial..."
         );
 
-      if (functionError) {
-        console.error(
-          "Error obteniendo resultado Face Liveness:",
-          functionError
+        const enrollResult =
+          await invokeFaceFunction("enroll-face");
+
+        if (enrollResult.error) {
+          const enrollMessage =
+            typeof enrollResult.data?.error === "string"
+              ? enrollResult.data.error
+              : "No se pudo registrar el rostro del usuario.";
+
+          throw new Error(enrollMessage);
+        }
+
+        if (enrollResult.data?.success !== true) {
+          throw new Error(
+            "AWS no confirmó el registro facial."
+          );
+        }
+
+        console.info(
+          "Rostro registrado correctamente:",
+          enrollResult.data
         );
 
-        throw new Error(
-          "No se pudo obtener el resultado de la verificación facial."
+        setIdentityResult("enrolled");
+        setLivenessCompleted(true);
+        setVerifyingFace(false);
+
+        // Pequeña pausa para mostrar la confirmación visual.
+        await new Promise((resolve) =>
+          setTimeout(resolve, 900)
         );
+
+        if (!onLoginSuccess) {
+          throw new Error(
+            "No se pudo completar la autorización del acceso."
+          );
+        }
+
+        onLoginSuccess();
+        return;
       }
 
-      console.info(
-        "Resultado Face Liveness:",
-        data
-      );
+      // ----------------------------------------------------------
+      // USUARIO YA REGISTRADO: DEBE COINCIDIR CON SU FACE ID
+      // ----------------------------------------------------------
 
-      if (data?.status !== "SUCCEEDED") {
-        throw new Error(
-          "La prueba de vida facial no fue aprobada."
-        );
+      if (verifyResult.error) {
+        const verifyMessage =
+          typeof verifyResult.data?.error === "string"
+            ? verifyResult.data.error
+            : "No se pudo verificar la identidad facial.";
+
+        // 401/403 = sesión inválida, Liveness insuficiente o
+        // el rostro no corresponde al usuario autenticado.
+        if (
+          verifyResult.status === 401 ||
+          verifyResult.status === 403
+        ) {
+          console.warn(
+            "Acceso facial rechazado:",
+            verifyResult.data
+          );
+
+          await supabase.auth.signOut();
+          setStep("access");
+          setToken("");
+          setPassword("");
+          setLivenessSessionId(null);
+        }
+
+        throw new Error(verifyMessage);
       }
 
       if (
-        typeof data.confidence !== "number" ||
-        data.confidence < 90
+        verifyResult.data?.success !== true ||
+        verifyResult.data?.verified !== true
       ) {
         throw new Error(
-          "La confianza de la prueba de vida no alcanzó el nivel requerido."
+          "La identidad facial no pudo ser confirmada."
         );
       }
 
-      setLivenessCompleted(true);
-
-      console.log(
-        "Face Liveness aprobado correctamente."
+      console.info(
+        "Identidad facial verificada correctamente:",
+        verifyResult.data
       );
 
-      setTimeout(() => {
-        onLoginSuccess?.();
-      }, 1200);
+      setIdentityResult("verified");
+      setLivenessCompleted(true);
       setVerifyingFace(false);
 
-      /*
-       * IMPORTANTE:
-       * Face Liveness confirma que existe una persona real.
-       * Todavía NO concedemos acceso al Dashboard.
-       *
-       * El siguiente paso del proyecto será utilizar la
-       * ReferenceImage para comparar el rostro actual contra
-       * el empleado registrado en la colección de Rekognition.
-       */
-
-      console.info(
-        `Face Liveness aprobado con confianza ${data.confidence}.`
+      // Pequeña pausa para mostrar la confirmación visual.
+      await new Promise((resolve) =>
+        setTimeout(resolve, 900)
       );
+
+      if (!onLoginSuccess) {
+        throw new Error(
+          "No se pudo completar la autorización del acceso."
+        );
+      }
+
+      onLoginSuccess();
     } catch (err: unknown) {
       console.error(
-        "Error en Face Liveness:",
+        "Error en autenticación facial:",
         err
       );
 
       setVerifyingFace(false);
       setLivenessSessionId(null);
       setLivenessCompleted(false);
+      setIdentityResult(null);
 
       setError(
         err instanceof Error
@@ -334,6 +477,7 @@ export default function Login({
       setLivenessSessionId(null);
       setLivenessLoading(false);
       setLivenessCompleted(false);
+      setIdentityResult(null);
       setVerifyingFace(false);
     }
   }, [step]);
@@ -2868,7 +3012,9 @@ export default function Login({
                         marginBottom: "6px",
                       }}
                     >
-                      Prueba de vida aprobada
+                      {identityResult === "enrolled"
+                        ? "Rostro registrado correctamente"
+                        : "Identidad confirmada"}
                     </div>
 
                     <div
@@ -2879,9 +3025,9 @@ export default function Login({
                         maxWidth: "320px",
                       }}
                     >
-                      Se confirmó que hay una persona real.
-                      La identificación facial del empleado
-                      se completará en el siguiente paso.
+                      {identityResult === "enrolled"
+                        ? "Tu rostro quedó vinculado a tu cuenta. A partir del próximo acceso deberá coincidir contigo."
+                        : "La prueba de vida y la identidad facial fueron verificadas correctamente."}
                     </div>
                   </div>
                 )}
@@ -2920,7 +3066,7 @@ export default function Login({
                       cursor: "default",
                     }}
                   >
-                    Prueba de vida completada ✓
+                    Acceso facial autorizado ✓
                   </button>
                 )}
 
@@ -2932,6 +3078,7 @@ export default function Login({
                     setLivenessSessionId(null);
                     setLivenessLoading(false);
                     setLivenessCompleted(false);
+                    setIdentityResult(null);
                     setVerifyingFace(false);
                     setStep("code");
                     setError(null);
