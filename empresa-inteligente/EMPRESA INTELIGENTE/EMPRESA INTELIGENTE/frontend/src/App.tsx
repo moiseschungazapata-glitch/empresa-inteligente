@@ -25,11 +25,15 @@ import Auditoria from "./pages/Auditoria";
 
 import "./index.css";
 import "./workspace.css";
+import "./theme.css";
+import ThemeToggle from "./components/ThemeToggle";
+import { useWorkspaceTheme } from "./hooks/useWorkspaceTheme";
 
 const BIOMETRIC_SESSION_KEY =
   "empresa-inteligente-biometric-verified";
 
 function App() {
+  const { theme, toggleTheme } = useWorkspaceTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,6 +50,10 @@ function App() {
   const [activePage, setActivePage] = useState("Dashboard");
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [activePage]);
 
   // Controla Login / Registro
   const [showRegister, setShowRegister] = useState(false);
@@ -186,7 +194,7 @@ function App() {
   // DASHBOARD
   // ----------------------------------------------------------
   return (
-    <div className={"app " + (collapsed ? "sidebar-collapsed" : "")}>
+    <div className={"app " + (collapsed ? "sidebar-collapsed" : "")} data-theme={theme}>
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
@@ -200,7 +208,7 @@ function App() {
         <header className="workspace-topbar">
           <button className="icon-button mobile-menu-toggle" aria-label="Abrir menú" onClick={() => setIsMobileOpen(true)}>☰</button>
           <span>Empresa Inteligente <span className="breadcrumb-divider">/</span> <strong>{activePage}</strong></span>
-          <span className="workspace-label">ESPACIO DE TRABAJO</span>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </header>
 
         {activePage === "Dashboard" && (

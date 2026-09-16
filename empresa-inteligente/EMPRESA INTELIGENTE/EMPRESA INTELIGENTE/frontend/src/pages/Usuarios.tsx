@@ -22,7 +22,6 @@ function Usuarios() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [message, setMessage] = useState("");
 
   // Formulario
   const [nombre, setNombre] = useState("");
@@ -63,7 +62,6 @@ function Usuarios() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (creando || registroFacial) return;
-    const registrarRostro = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "rostro";
 
     if (
       !nombre.trim() ||
@@ -123,9 +121,7 @@ function Usuarios() {
         return;
       }
 
-      if (registrarRostro) {
-        setRegistroFacial({ nombre: nombre.trim(), email: email.trim().toLowerCase() });
-      }
+      setRegistroFacial({ nombre: nombre.trim(), email: email.trim().toLowerCase() });
 
       // Limpiar formulario
       setNombre("");
@@ -136,7 +132,7 @@ function Usuarios() {
 
       await obtenerUsuarios();
 
-      if (!registrarRostro) { setFormOpen(false); setMessage("Usuario creado correctamente."); }
+
     } catch (error) {
       console.error(error);
       alert("Ocurrió un error al crear el usuario.");
@@ -176,7 +172,6 @@ function Usuarios() {
     <header className="users-heading"><div><span className="eyebrow">CONFIGURACIÓN / EQUIPO</span><h1>Gestión de usuarios</h1><p>Administra tu equipo y sus accesos a la plataforma.</p></div>
       <button className="btn-primary" onClick={() => setFormOpen(true)}><span aria-hidden="true">＋</span> Nuevo usuario</button>
     </header>
-    {message && <p role="status" className="success-message">{message}</p>}
     <section className="panel users-list">
       <div className="users-toolbar"><div><h2>Usuarios del equipo <span className="count-badge">{usuarios.length}</span></h2><p>Personas registradas en tu organización</p></div>
         <label className="user-search"><span aria-hidden="true">⌕</span><input aria-label="Buscar usuarios" placeholder="Buscar por nombre, correo o rol…" value={search} onChange={e => setSearch(e.target.value)} /></label>
@@ -192,16 +187,16 @@ function Usuarios() {
     </section>
     {formOpen && <Modal title={registroFacial ? "Registro facial" : "Nuevo trabajador"} busy={creando || registroFacial !== null} onClose={closeForm}>
       {registroFacial ? <RegistroRostro {...registroFacial} onClose={closeForm} /> : <form onSubmit={handleSubmit}>
-        <p className="form-intro">Completa los datos del trabajador y asigna su rol de acceso.</p>
+        <p className="form-intro">Completa los datos del trabajador y selecciona su función dentro del equipo.</p>
         <fieldset className="user-form-fields" disabled={creando}>
-          <label className="field-label full-width">Nombre completo<input autoFocus required value={nombre} autoComplete="name" placeholder="Ej. Ana García López" onChange={e => setNombre(e.target.value)} /></label>
+          <label className="field-label full-width">Nombre completo<input required value={nombre} autoComplete="name" placeholder="Ej. Ana García López" onChange={e => setNombre(e.target.value)} /></label>
           <label className="field-label full-width">Correo electrónico<input required type="email" autoComplete="email" value={email} placeholder="nombre@empresa.com" onChange={e => setEmail(e.target.value)} /></label>
           <label className="field-label">Contraseña<input required minLength={6} type="password" autoComplete="new-password" value={password} placeholder="Mínimo 6 caracteres" onChange={e => setPassword(e.target.value)} /></label>
           <label className="field-label">Confirmar contraseña<input required minLength={6} type="password" autoComplete="new-password" value={confirmPassword} placeholder="Repite la contraseña" onChange={e => setConfirmPassword(e.target.value)} /></label>
-          <label className="field-label full-width">Rol de acceso<select value={rol} onChange={e => setRol(e.target.value)}><option>Analista</option><option>Administrador</option><option>Supervisor</option></select></label>
+          <label className="field-label full-width">Rol del trabajador<select aria-describedby="role-description" value={rol} onChange={e => setRol(e.target.value)}><option>Analista</option><option>Administrador</option><option>Supervisor</option></select><span id="role-description" className="role-description">{rol === "Administrador" ? "Responsable de la administración y configuración del sistema." : rol === "Supervisor" ? "Responsable de supervisar al equipo y revisar sus resultados." : "Encargado de analizar comentarios, datos y reportes."} El rol describe su función; el estado indica si la cuenta está activa.</span></label>
           <div className="enrollment-note full-width"><strong>Registro facial</strong><p>Para registrar el rostro ahora, el trabajador debe estar presente y tener acceso a su correo y a la cámara.</p></div>
         </fieldset>
-        <div className="modal-actions"><button type="button" className="btn-secondary" disabled={creando} onClick={closeForm}>Cancelar</button><button type="submit" className="btn-secondary" disabled={creando}>Solo crear usuario</button><button type="submit" name="accion" value="rostro" className="btn-primary" disabled={creando}>{creando ? "Creando…" : "Crear y registrar rostro"}</button></div>
+        <div className="modal-actions"><button type="button" className="btn-secondary" disabled={creando} onClick={closeForm}>Cancelar</button><button type="submit" name="accion" value="rostro" className="btn-primary" disabled={creando}>{creando ? "Creando…" : "Crear y registrar rostro"}</button></div>
       </form>}
     </Modal>}
   </main>;

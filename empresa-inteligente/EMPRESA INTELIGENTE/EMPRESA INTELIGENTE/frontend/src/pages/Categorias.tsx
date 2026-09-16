@@ -89,16 +89,16 @@ function Categorias() {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             required
-            style={{ padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }}
+            style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)" }}
           />
           <input
             type="text"
             placeholder="Descripción"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            style={{ padding: "8px", borderRadius: "4px", border: "1px solid #ccc", flex: 1 }}
+            style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)", flex: 1 }}
           />
-          <button type="submit" className="btn-primary" style={{ padding: "8px 16px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "4px" }}>
+          <button type="submit" className="btn-primary" style={{ padding: "8px 16px", background: "var(--accent)", color: "var(--on-accent)", border: "none", borderRadius: "4px" }}>
             Agregar
           </button>
         </form>
@@ -113,7 +113,7 @@ function Categorias() {
             placeholder="Filtrar categorías..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            style={{ padding: "8px", borderRadius: "4px", border: "1px solid #ccc", width: "250px" }}
+            style={{ padding: "8px", borderRadius: "4px", border: "1px solid var(--border)", width: "250px" }}
           />
         </div>
 
@@ -140,7 +140,7 @@ function Categorias() {
                       <td>
                         <button
                           onClick={() => handleEliminar(cat.id)}
-                          style={{ background: "#dc2626", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
+                          style={{ background: "var(--danger-solid)", color: "var(--on-accent)", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
                         >
                           Eliminar
                         </button>

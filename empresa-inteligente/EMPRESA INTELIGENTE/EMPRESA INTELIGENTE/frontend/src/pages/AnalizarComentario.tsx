@@ -133,148 +133,28 @@ export function AnalizarComentario() {
     setAnalisis(resultado);
   };
 
-  return (
-    <main className="dashboard">
-      <div className="topbar">
-        <div>
-          <h1>Analizar comentario</h1>
-          <p>Análisis inteligente de comentarios mediante NLP</p>
-        </div>
-      </div>
-
-      <section className="panel" style={{ marginBottom: "20px" }}>
-        <div className="panel-header" style={{ marginBottom: "12px" }}>
-          <div>
-            <h3>Comentarios recibidos en tiempo real</h3>
-            <span>Haz clic en "Analizar" para procesar el comentario de inmediato</span>
-          </div>
-        </div>
-
-        {cargando ? (
-          <p style={{ color: "#6b7280" }}>Cargando comentarios...</p>
-        ) : comentariosRecibidos.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>No hay comentarios registrados aún.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "280px", overflowY: "auto" }}>
-            {comentariosRecibidos.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  backgroundColor: "#f9fafb",
-                  border: "1px solid #e5e7eb",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "12px",
-                }}
-              >
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937", display: "block" }}>
-                    "{item.contenido}"
-                  </span>
-                  <small style={{ color: "#6b7280", fontSize: "12px" }}>
-                    Canal: {item.canal || "Web"} | Estado: {item.estado || "Pendiente"}
-                  </small>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => analizarComentarioDirecto(item.contenido)}
-                  style={{
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "8px 14px",
-                    borderRadius: "6px",
-                    fontWeight: "600",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  🧠 Analizar
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+  return <main className="dashboard">
+    <header className="topbar"><div><span className="eyebrow">INTELIGENCIA NLP</span><h1>Analizar comentario</h1><p>Explora el sentimiento y la categoría de los comentarios recibidos.</p></div></header>
+    <section className="panel"><div className="panel-header"><div><h3>Comentarios recibidos</h3><span>Selecciona un comentario para consultar su análisis</span></div><span className="count-badge">{comentariosRecibidos.length}</span></div>
+      {cargando ? <p role="status">Cargando comentarios…</p> : comentariosRecibidos.length === 0 ? <p>No hay comentarios registrados aún.</p> : <div className="comment-list">
+        {comentariosRecibidos.map(item => <article key={item.id} className={"comment-item " + (comentarioSeleccionado === item.contenido ? "selected" : "")}><div className="comment-text"><strong>“{item.contenido}”</strong><small>{item.canal || "Web"} · {item.estado || "Pendiente"}</small></div><button type="button" className="btn-primary" onClick={() => analizarComentarioDirecto(item.contenido)}>Analizar</button></article>)}
+      </div>}
+    </section>
+    {!analisis && <div className="analysis-result analysis-empty">Selecciona «Analizar» para ver aquí el resultado del comentario.</div>}
+    {comentarioSeleccionado && analisis && <div className="analysis-result" aria-live="polite">
+      <section className="kpi-grid">
+        <div className="kpi-card"><h3>Sentimiento</h3><div className="number metric-label" style={{ color: analisis.sentimiento === "Positivo" ? "var(--success)" : analisis.sentimiento === "Negativo" ? "var(--danger)" : "var(--warning)" }}>{analisis.sentimiento}</div><div className="description">Polaridad del comentario</div></div>
+        <div className="kpi-card"><h3>Categoría detectada</h3><div className="number metric-label">{analisis.categoria}</div><div className="description">Clasificación del requerimiento</div></div>
+        <div className="kpi-card"><h3>Confianza estimada</h3><div className="number">{analisis.confianza}%</div><div className="description">Estimación según coincidencias</div></div>
+        <div className="kpi-card"><h3>Palabras procesadas</h3><div className="number">{comentarioSeleccionado.trim().split(/\s+/).length}</div><div className="description">Total de términos del comentario</div></div>
       </section>
-
-      {comentarioSeleccionado && analisis && (
-        <>
-          <section className="kpi-grid">
-            <div className="kpi-card">
-              <h3>Sentimiento Predicho</h3>
-              <div
-                className="number"
-                style={{
-                  color:
-                    analisis.sentimiento === "Positivo"
-                      ? "#10b981"
-                      : analisis.sentimiento === "Negativo"
-                      ? "#ef4444"
-                      : "#f59e0b",
-                }}
-              >
-                {analisis.sentimiento}
-              </div>
-              <div className="description">Análisis de polaridad emocional</div>
-            </div>
-
-            <div className="kpi-card">
-              <h3>Requerimiento / Categoría</h3>
-              <div className="number">{analisis.categoria}</div>
-              <div className="description">Clasificación automática</div>
-            </div>
-
-            <div className="kpi-card">
-              <h3>Confianza del Modelo</h3>
-              <div className="number">{analisis.confianza}%</div>
-              <div className="description">Precisión estimada</div>
-            </div>
-
-            <div className="kpi-card">
-              <h3>Palabras Procesadas</h3>
-              <div className="number">{comentarioSeleccionado.trim().split(/\s+/).length}</div>
-              <div className="description">Total de términos</div>
-            </div>
-          </section>
-
-          <section className="panel" style={{ marginTop: "20px" }}>
-            <div className="panel-header">
-              <div>
-                <h3>Resultado del análisis NLP</h3>
-                <span>Desglose de la predicción obtenida</span>
-              </div>
-            </div>
-
-            <p style={{ marginBottom: "8px", fontWeight: "bold" }}>Comentario analizado:</p>
-
-            <p
-              style={{
-                background: "#f9fafb",
-                padding: "15px",
-                borderRadius: "8px",
-                marginBottom: "15px",
-                border: "1px solid #e5e7eb",
-                fontSize: "14px",
-                color: "#1f2937",
-              }}
-            >
-              "{comentarioSeleccionado}"
-            </p>
-
-            <p style={{ fontSize: "14px", color: "#4b5563" }}>
-              <strong>Diagnóstico:</strong> El comentario se categorizó como <strong>{analisis.categoria}</strong> con una polaridad <strong>{analisis.sentimiento.toLowerCase()}</strong>.
-              {analisis.palabrasClave.length > 0 && ` Palabras clave detectadas: ${analisis.palabrasClave.join(", ")}.`}
-            </p>
-          </section>
-        </>
-      )}
-    </main>
-  );
+      <section className="panel"><div className="panel-header"><div><h3>Resultado del análisis</h3><span>Detalle del comentario seleccionado</span></div></div>
+        <blockquote className="analysis-quote">“{comentarioSeleccionado}”</blockquote>
+        <p>El comentario se clasificó como <strong>{analisis.categoria}</strong>, con un sentimiento <strong>{analisis.sentimiento.toLowerCase()}</strong>.</p>
+        <div className="keyword-list">{analisis.palabrasClave.length ? analisis.palabrasClave.map(word => <span className="keyword" key={word}>{word}</span>) : <p>No se detectaron palabras clave.</p>}</div>
+      </section>
+    </div>}
+  </main>;
 }
 
 export default AnalizarComentario;

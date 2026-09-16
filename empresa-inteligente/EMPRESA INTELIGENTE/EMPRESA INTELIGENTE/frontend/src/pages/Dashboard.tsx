@@ -1,4 +1,3 @@
-import { supabase } from "../services/supabaseClient";
 import {
   BarChart,
   Bar,
@@ -38,73 +37,15 @@ const palabras = [
   { palabra: "rápido", cantidad: 94 }
 ];
 
-const colores = [
-  "#2563eb",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444"
-];
+const colores = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
 
 function Dashboard() {
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
 
   return (
     <main className="dashboard">
 
-      {/* ENCABEZADO */}
-      <div className="topbar">
-        <div>
-          <h1>Dashboard</h1>
-          <p>Centro de inteligencia empresarial</p>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ 
-              width: "40px", 
-              height: "40px", 
-              borderRadius: "50%", 
-              backgroundColor: "#2563eb", 
-              color: "white", 
-              display: "flex", 
-              justifyContent: "center", 
-              alignItems: "center", 
-              fontWeight: "bold", 
-              fontSize: "16px" 
-            }}>
-              M
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", fontSize: "14px", lineHeight: "1.3" }}>
-              <span style={{ fontWeight: "700", color: "#0f172a" }}>Moisés Chunga</span>
-              <span style={{ color: "#64748b", fontSize: "12px" }}>Administrador</span>
-            </div>
-          </div>
-
-          <button 
-            onClick={handleLogout}
-            style={{ 
-              background: "#ef4444", 
-              color: "white", 
-              border: "none", 
-              padding: "8px 16px", 
-              borderRadius: "6px", 
-              cursor: "pointer", 
-              fontSize: "13px",
-              fontWeight: "600"
-            }}
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </div>
-
-      {/* BIENVENIDA */}
-      <section className="welcome">
-        <h2>Bienvenido a Empresa Inteligente 👋</h2>
-        <p>Analiza clientes, comentarios y datos empresariales utilizando inteligencia artificial.</p>
-      </section>
+      <header className="topbar"><div><span className="eyebrow">RESUMEN GENERAL</span><h1>Dashboard</h1><p>Una visión general de la actividad de tu organización.</p></div><span className="demo-badge">Datos de demostración</span></header>
+      <section className="welcome"><h2>Tu centro de inteligencia empresarial</h2><p>Consulta la actividad, identifica tendencias y explora los resultados del equipo.</p></section>
 
       {/* KPIs */}
       <section className="kpi-grid">
@@ -142,11 +83,11 @@ function Dashboard() {
           <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={tiempos}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 5" vertical={false} />
                 <XAxis dataKey="dia" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="minutos" name="Minutos" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="minutos" name="Minutos" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -162,7 +103,7 @@ function Dashboard() {
           <div style={{ width: "100%", height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={categorias} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} label>
+                <Pie data={categorias} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} stroke="var(--surface)">
                   {categorias.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={colores[index]} />
                   ))}
@@ -188,11 +129,11 @@ function Dashboard() {
           <div style={{ width: "100%", height: 280, marginTop: "5px" }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart layout="vertical" data={palabras} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 5" vertical={false} />
                 <XAxis type="number" />
                 <YAxis dataKey="palabra" type="category" width={80} />
                 <Tooltip />
-                <Bar dataKey="cantidad" name="Apariciones" fill="#3b82f6" barSize={18} radius={[0, 6, 6, 0]} />
+                <Bar dataKey="cantidad" name="Apariciones" fill="var(--chart-1)" barSize={18} radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -202,35 +143,13 @@ function Dashboard() {
         <div className="panel">
           <div className="panel-header">
             <div>
-              <h3>Estado del sistema</h3>
-              <span>Servicios principales</span>
+              <h3>Herramientas de la plataforma</h3>
+              <span>Módulos de tu espacio de trabajo</span>
             </div>
           </div>
 
-          <div className="system-status" style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "15px" }}>
-            <div className="status" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div className="status-dot" style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%" }}></div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <strong>Base de datos</strong>
-                <small style={{ color: "#64748b" }}>Conectada (Supabase)</small>
-              </div>
-            </div>
-
-            <div className="status" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div className="status-dot" style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%" }}></div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <strong>NLP</strong>
-                <small style={{ color: "#64748b" }}>Activo y respondiendo</small>
-              </div>
-            </div>
-
-            <div className="status" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div className="status-dot" style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%" }}></div>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <strong>SciPy</strong>
-                <small style={{ color: "#64748b" }}>Procesamiento numérico activo</small>
-              </div>
-            </div>
+          <div className="system-status">
+            {[{ name: "Base de datos", detail: "Supabase · Gestión de información" }, { name: "Análisis de comentarios", detail: "Clasificación y detección de palabras" }, { name: "Scientific Data", detail: "Estadísticas y análisis numérico" }].map(service => <div className="status" key={service.name}><span className="status-dot" /><div><strong>{service.name}</strong><small>{service.detail}</small></div></div>)}
           </div>
         </div>
       </section>

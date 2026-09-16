@@ -50,7 +50,7 @@ function Clasificacion() {
           style={{
             width: "100%",
             padding: "15px",
-            border: "1px solid #d1d5db",
+            border: "1px solid var(--border)",
             borderRadius: "8px",
             resize: "vertical",
             fontFamily: "inherit",
@@ -164,7 +164,7 @@ function Clasificacion() {
 
             <p
               style={{
-                background: "#f9fafb",
+                background: "var(--surface-raised)",
                 padding: "15px",
                 borderRadius: "8px",
                 marginTop: "10px",

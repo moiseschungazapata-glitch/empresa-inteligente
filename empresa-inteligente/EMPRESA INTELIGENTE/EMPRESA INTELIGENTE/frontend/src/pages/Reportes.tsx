@@ -49,7 +49,7 @@ function Reportes() {
             onChange={(e) => setTipo(e.target.value)}
             style={{
               padding: "11px 13px",
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--border)",
               borderRadius: "7px",
               outline: "none"
             }}

@@ -132,7 +132,7 @@ function Comentarios() {
             style={{
               width: "100%",
               padding: "12px",
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--border)",
               borderRadius: "7px",
               resize: "vertical"
             }}
@@ -190,7 +190,7 @@ function Comentarios() {
                   <td>
                     <button
                       onClick={() => eliminarComentario(comentario.id)}
-                      style={{ background: "#dc2626", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
+                      style={{ background: "var(--danger-solid)", color: "var(--on-accent)", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
                     >
                       Eliminar
                     </button>

@@ -104,9 +104,9 @@ function Auditoria() {
             onChange={(e) => setFiltro(e.target.value)}
             style={{
               padding: "10px 14px",
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--border)",
               borderRadius: "7px",
-              background: "white"
+              background: "var(--input)"
             }}
           >
             <option value="Todas">Todas las acciones</option>
@@ -147,7 +147,7 @@ function Auditoria() {
                       <button
                         className="action-delete"
                         onClick={() => eliminarRegistro(registro.id)}
-                        style={{ background: "#dc2626", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
+                        style={{ background: "var(--danger-solid)", color: "var(--on-accent)", border: "none", padding: "5px 10px", borderRadius: "4px", cursor: "pointer" }}
                       >
                         Eliminar
                       </button>
