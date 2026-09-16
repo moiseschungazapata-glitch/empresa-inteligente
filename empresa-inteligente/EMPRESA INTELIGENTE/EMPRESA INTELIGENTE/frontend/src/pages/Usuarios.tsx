@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import RegistroRostro from "../components/auth/RegistroRostro";
 
 interface Usuario {
   id: number;
@@ -15,6 +16,7 @@ function Usuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [creando, setCreando] = useState(false);
+  const [registroFacial, setRegistroFacial] = useState<{ nombre: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Formulario
@@ -55,6 +57,8 @@ function Usuarios() {
   // ==============================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creando || registroFacial) return;
+    const registrarRostro = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "rostro";
 
     if (
       !nombre.trim() ||
@@ -114,6 +118,10 @@ function Usuarios() {
         return;
       }
 
+      if (registrarRostro) {
+        setRegistroFacial({ nombre: nombre.trim(), email: email.trim().toLowerCase() });
+      }
+
       // Limpiar formulario
       setNombre("");
       setEmail("");
@@ -123,7 +131,7 @@ function Usuarios() {
 
       await obtenerUsuarios();
 
-      alert("Usuario creado correctamente.");
+      if (!registrarRostro) alert("Usuario creado correctamente.");
     } catch (error) {
       console.error(error);
       alert("Ocurrió un error al crear el usuario.");
@@ -209,6 +217,7 @@ function Usuarios() {
           onSubmit={handleSubmit}
           className="form-grid"
         >
+          <fieldset disabled={creando || registroFacial !== null} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
 
           <input
             type="text"
@@ -265,9 +274,17 @@ function Usuarios() {
               : "Crear usuario"}
           </button>
 
+          <button type="submit" name="accion" value="rostro" className="btn-primary" disabled={creando}>
+            Crear usuario y registrar rostro
+          </button>
+          <p>Para registrar el rostro, el trabajador debe estar presente y tener acceso a su correo.</p>
+          </fieldset>
+
         </form>
 
       </section>
+
+      {registroFacial && <RegistroRostro {...registroFacial} onClose={() => setRegistroFacial(null)} />}
 
       {/* ==============================
           TABLA
