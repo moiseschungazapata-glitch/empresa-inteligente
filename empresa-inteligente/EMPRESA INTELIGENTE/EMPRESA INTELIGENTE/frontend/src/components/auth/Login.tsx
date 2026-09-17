@@ -2488,16 +2488,13 @@ export default function Login({
               ================================================= */}
 
               <div className="mascot-status">
-
-                {step === "access" &&
-                  "Sistema inteligente"}
-
-                {step === "code" &&
-                  "Verificación de acceso"}
-
-                {step === "identity" &&
-                  "Validación de identidad"}
-
+                <span>
+                  {step === "access"
+                    ? "Sistema inteligente"
+                    : step === "code"
+                    ? "Verificación de acceso"
+                    : "Validación de identidad"}
+                </span>
               </div>
 
               <div className="visual-title">
