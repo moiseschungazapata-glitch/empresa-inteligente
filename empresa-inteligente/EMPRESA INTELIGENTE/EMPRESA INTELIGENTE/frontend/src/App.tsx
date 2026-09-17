@@ -173,6 +173,8 @@ function App() {
   if (!session || !biometricVerified) {
     return (
       <Login
+        theme={theme}
+        onToggleTheme={toggleTheme}
         onLoginSuccess={() => {
           sessionStorage.setItem(
             BIOMETRIC_SESSION_KEY,

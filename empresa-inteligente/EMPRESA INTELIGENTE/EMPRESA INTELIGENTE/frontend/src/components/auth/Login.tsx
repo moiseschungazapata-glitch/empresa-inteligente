@@ -10,6 +10,8 @@ import { createClient } from "@supabase/supabase-js";
 import { FaceLivenessDetector } from "@aws-amplify/ui-react-liveness";
 import "@aws-amplify/ui-react/styles.css";
 import { supabase } from "../../services/supabaseClient";
+import ThemeToggle from "../ThemeToggle";
+import type { WorkspaceTheme } from "../../hooks/useWorkspaceTheme";
 
 // ============================================================
 // CLIENTE TEMPORAL
@@ -33,6 +35,8 @@ const tempSupabase = createClient(
 interface LoginProps {
   onLoginSuccess?: () => void;
   onRegister?: () => void;
+  theme: WorkspaceTheme;
+  onToggleTheme: () => void;
 }
 
 type Step = "access" | "code" | "identity";
@@ -40,6 +44,8 @@ type Step = "access" | "code" | "identity";
 export default function Login({
   onLoginSuccess,
   onRegister,
+  theme,
+  onToggleTheme,
 }: LoginProps) {
 
   // ============================================================
@@ -1419,6 +1425,50 @@ export default function Login({
           outline-offset: 3px;
         }
 
+        .login-theme-toggle {
+          position: absolute;
+          top: 24px;
+          right: 32px;
+          z-index: 2;
+        }
+
+        .login-theme-toggle .theme-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 9px;
+          background: #ffffff;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .login-theme-toggle .theme-toggle:hover { background: #f8fafc; border-color: #cbd5e1; }
+        .login-theme-toggle .theme-toggle:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+
+        .login-page[data-theme="dark"] { background: #0f172a; }
+        .login-page[data-theme="dark"] .login-form-panel { background: #0f172a; }
+        .login-page[data-theme="dark"] .landing-back-link,
+        .login-page[data-theme="dark"] .login-theme-toggle .theme-toggle { background: #172033; border-color: #334155; color: #cbd5e1; }
+        .login-page[data-theme="dark"] .landing-back-link:hover,
+        .login-page[data-theme="dark"] .login-theme-toggle .theme-toggle:hover { background: #1e293b; border-color: #475569; }
+        .login-page[data-theme="dark"] .form-title,
+        .login-page[data-theme="dark"] .input-label,
+        .login-page[data-theme="dark"] .forgot,
+        .login-page[data-theme="dark"] .register-button,
+        .login-page[data-theme="dark"] .otp-input { color: #f8fafc; }
+        .login-page[data-theme="dark"] .form-description,
+        .login-page[data-theme="dark"] .remember,
+        .login-page[data-theme="dark"] .back-button { color: #a8b5c8; }
+        .login-page[data-theme="dark"] .login-input,
+        .login-page[data-theme="dark"] .otp-input { background: #172033; border-color: #334155; color: #f8fafc; }
+        .login-page[data-theme="dark"] .login-input:focus,
+        .login-page[data-theme="dark"] .otp-input:focus { background: #1e293b; border-color: #94a3b8; }
+        .login-page[data-theme="dark"] .security-line { border-top-color: #263246; }
+
         .login-form-container {
           width: 100%;
           max-width: 430px;
@@ -2369,6 +2419,7 @@ export default function Login({
 
       <div
         className="login-page"
+        data-theme={theme}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -2527,6 +2578,10 @@ export default function Login({
         ====================================================== */}
 
         <section className="login-form-panel">
+
+          <div className="login-theme-toggle">
+            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          </div>
 
           <a className="landing-back-link" href="/landing">
             <span aria-hidden="true">←</span>
