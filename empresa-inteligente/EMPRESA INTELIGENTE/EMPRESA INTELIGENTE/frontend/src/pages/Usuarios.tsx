@@ -17,6 +17,7 @@ function Usuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [creando, setCreando] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState<number | null>(null);
   const [registroFacial, setRegistroFacial] = useState<{ nombre: string; email: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,19 +152,40 @@ function Usuarios() {
 
     if (!confirmar) return;
 
-    const { error } = await supabase
-      .from("usuarios")
-      .delete()
-      .eq("id", id);
+    setEliminandoId(id);
 
-    if (error) {
-      alert("Error al eliminar: " + error.message);
-      return;
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "eliminar-usuario",
+        { body: { id } }
+      );
+
+      if (error) {
+        let mensaje = error.message;
+
+        try {
+          const body = await error.context?.json();
+          if (body?.error) mensaje = body.error;
+        } catch {
+          // Conservamos el mensaje original si la respuesta no contiene JSON.
+        }
+
+        alert("Error al eliminar: " + mensaje);
+        return;
+      }
+
+      if (!data?.success) {
+        alert(data?.error || "No se pudo eliminar el usuario.");
+        return;
+      }
+
+      await obtenerUsuarios();
+    } catch (error) {
+      console.error(error);
+      alert("Ocurrió un error al eliminar el usuario.");
+    } finally {
+      setEliminandoId(null);
     }
-
-    setUsuarios((actuales) =>
-      actuales.filter((usuario) => usuario.id !== id)
-    );
   };
 
   const visibles = usuarios.filter(u => (u.nombre + " " + u.email + " " + u.rol).toLowerCase().includes(search.toLowerCase()));
@@ -181,7 +203,7 @@ function Usuarios() {
         <tbody>{loading ? <tr><td colSpan={5} className="table-empty">Cargando usuarios…</td></tr> : visibles.length === 0 ? <tr><td colSpan={5} className="table-empty">{search ? "No hay usuarios que coincidan con tu búsqueda." : "Aún no hay usuarios registrados."}</td></tr> : visibles.map(u => <tr key={u.id}>
           <td><div className="table-person"><span className="table-avatar">{u.nombre.split(/\s+/).slice(0, 2).map(n => n[0]).join("").toUpperCase()}</span><div><strong>{u.nombre}</strong><small>ID {String(u.id).padStart(3, "0")}</small></div></div></td>
           <td>{u.email}</td><td><span className="role-badge">{u.rol}</span></td><td><span className={"status-badge " + (u.activo ? "is-active" : "")}><span />{u.activo ? "Activo" : "Inactivo"}</span></td>
-          <td className="align-right"><button className="btn-danger" aria-label={"Eliminar a " + u.nombre} onClick={() => eliminarUsuario(u.id)}>Eliminar</button></td>
+          <td className="align-right"><button className="btn-danger" disabled={eliminandoId !== null} aria-label={"Eliminar a " + u.nombre} onClick={() => eliminarUsuario(u.id)}>{eliminandoId === u.id ? "Eliminando…" : "Eliminar"}</button></td>
         </tr>)}</tbody></table></div>
       <footer className="users-list-footer">{visibles.length} de {usuarios.length} usuarios</footer>
     </section>
