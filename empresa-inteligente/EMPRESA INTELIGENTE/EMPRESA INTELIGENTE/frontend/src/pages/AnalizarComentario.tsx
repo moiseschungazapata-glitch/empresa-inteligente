@@ -21,13 +21,11 @@ export function AnalizarComentario() {
   const [analisis, setAnalisis] = useState<ResultadoAnalisis | null>(null);
   const [comentariosRecibidos, setComentariosRecibidos] = useState<ComentarioCliente[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
-  useEffect(() => {
-    obtenerComentarios();
-  }, []);
-
-  const obtenerComentarios = async () => {
+  async function obtenerComentarios() {
     setCargando(true);
+    setErrorCarga(null);
     const { data, error } = await supabase
       .from("comentarios")
       .select("*")
@@ -35,9 +33,28 @@ export function AnalizarComentario() {
 
     if (!error && data) {
       setComentariosRecibidos(data);
+    } else if (error) {
+      setErrorCarga("No se pudieron cargar los comentarios.");
     }
     setCargando(false);
-  };
+  }
+
+  useEffect(() => {
+    void obtenerComentarios();
+
+    const channel = supabase
+      .channel("analisis-comentarios-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comentarios" },
+        () => void obtenerComentarios(),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   const procesarTextoNLP = (texto: string): ResultadoAnalisis => {
     const textoClean = texto.toLowerCase();
@@ -134,9 +151,10 @@ export function AnalizarComentario() {
   };
 
   return <main className="dashboard">
-    <header className="topbar"><div><span className="eyebrow">INTELIGENCIA NLP</span><h1>Analizar comentario</h1><p>Explora el sentimiento y la categoría de los comentarios recibidos.</p></div></header>
+    <header className="topbar"><div><span className="eyebrow">INTELIGENCIA NLP</span><h1>Analizar comentario</h1><p>Explora el sentimiento y la categoría de los comentarios recibidos.</p></div><a className="btn-primary external-action" href="/landing" target="_blank" rel="noopener noreferrer">Abrir formulario público <span aria-hidden="true">↗</span></a></header>
+    <aside className="data-flow-note"><span className="data-flow-icon" aria-hidden="true">⌁</span><div><strong>Origen de los comentarios</strong><p>El formulario público guarda cada texto en <code>Supabase → comentarios → contenido</code>. Esta pantalla escucha esa tabla y se actualiza automáticamente.</p></div></aside>
     <section className="panel"><div className="panel-header"><div><h3>Comentarios recibidos</h3><span>Selecciona un comentario para consultar su análisis</span></div><span className="count-badge">{comentariosRecibidos.length}</span></div>
-      {cargando ? <p role="status">Cargando comentarios…</p> : comentariosRecibidos.length === 0 ? <p>No hay comentarios registrados aún.</p> : <div className="comment-list">
+      {errorCarga ? <p role="alert">{errorCarga} <button type="button" className="btn-secondary" onClick={() => void obtenerComentarios()}>Reintentar</button></p> : cargando ? <p role="status">Cargando comentarios…</p> : comentariosRecibidos.length === 0 ? <p>No hay comentarios registrados aún.</p> : <div className="comment-list">
         {comentariosRecibidos.map(item => <article key={item.id} className={"comment-item " + (comentarioSeleccionado === item.contenido ? "selected" : "")}><div className="comment-text"><strong>“{item.contenido}”</strong><small>{item.canal || "Web"} · {item.estado || "Pendiente"}</small></div><button type="button" className="btn-primary" onClick={() => analizarComentarioDirecto(item.contenido)}>Analizar</button></article>)}
       </div>}
     </section>

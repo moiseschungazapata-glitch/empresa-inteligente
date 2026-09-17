@@ -114,6 +114,14 @@
 .app tbody tr:hover { background: var(--surface-raised); }
 .app .badge { background: var(--surface-raised); color: var(--text); border-color: var(--border); }
 .app .new-client-button, .app .form-actions button[type="submit"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.app a.btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--accent-border); border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.app a.btn-primary:hover { background: var(--accent-hover); }
+.app a.btn-primary:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.app .data-flow-note { display: flex; align-items: flex-start; gap: 13px; padding: 15px 17px; margin-bottom: 20px; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 10px; }
+.app .data-flow-icon { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; background: var(--surface); color: var(--accent-text); font-size: 18px; }
+.app .data-flow-note strong { display: block; color: var(--text); font-size: 12px; font-weight: 600; }
+.app .data-flow-note p { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.app .data-flow-note code { color: var(--accent-text); font-size: inherit; }
 .app .action-delete { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-border); }
 .app input:not([type="checkbox"]):not([type="radio"]), .app select, .app textarea { color-scheme: inherit; background: var(--input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; max-width: 100%; min-width: 0; }
 .app input::placeholder, .app textarea::placeholder { color: var(--muted); opacity: 1; }
