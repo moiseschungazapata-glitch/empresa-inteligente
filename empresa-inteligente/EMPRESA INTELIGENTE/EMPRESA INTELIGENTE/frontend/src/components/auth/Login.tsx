@@ -1378,6 +1378,8 @@ export default function Login({
 
           min-height: 100vh;
 
+          position: relative;
+
           background: #ffffff;
 
           display: flex;
@@ -1387,6 +1389,34 @@ export default function Login({
           justify-content: center;
 
           padding: 60px 8%;
+        }
+
+        .landing-back-link {
+          position: absolute;
+          top: 24px;
+          left: 32px;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 9px;
+          background: #ffffff;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 700;
+          text-decoration: none;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .landing-back-link:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+        }
+
+        .landing-back-link:focus-visible {
+          outline: 2px solid #2563eb;
+          outline-offset: 3px;
         }
 
         .login-form-container {
@@ -2500,6 +2530,11 @@ export default function Login({
         ====================================================== */}
 
         <section className="login-form-panel">
+
+          <a className="landing-back-link" href="/landing">
+            <span aria-hidden="true">←</span>
+            Volver a comentarios
+          </a>
 
           <div className="login-form-container">
 

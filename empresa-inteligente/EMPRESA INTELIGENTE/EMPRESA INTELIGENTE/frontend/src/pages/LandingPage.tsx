@@ -65,6 +65,26 @@ export function LandingPage() {
           width: "100%",
         }}
       >
+        <a
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            marginBottom: "22px",
+            padding: "9px 12px",
+            border: "1px solid #cbd5e1",
+            borderRadius: "8px",
+            color: "#475569",
+            fontSize: "12px",
+            fontWeight: "700",
+            textDecoration: "none",
+          }}
+        >
+          <span aria-hidden="true">←</span>
+          Volver al inicio de sesión
+        </a>
+
         <h2 style={{ fontSize: "22px", fontWeight: "bold", color: "#0f172a", marginBottom: "8px" }}>
           Empresa Inteligente
         </h2>
