@@ -15,7 +15,6 @@ import Solicitudes from "./pages/Solicitudes";
 import TiemposAtencion from "./pages/TiemposAtencion";
 import PalabrasFrecuentes from "./pages/PalabrasFrecuentes";
 import Categorias from "./pages/Categorias";
-import Clasificacion from "./pages/Clasificacion";
 import Estadisticas from "./pages/Estadisticas";
 import Interpolacion from "./pages/Interpolacion";
 import Optimizacion from "./pages/Optimizacion";
@@ -241,10 +240,6 @@ function App() {
 
         {(activePage === "Categorías" || activePage === "Categorías Sistema" || activePage === "Categorías NLP") && (
           <Categorias />
-        )}
-
-        {activePage === "Clasificación" && (
-          <Clasificacion />
         )}
 
         {activePage === "Estadísticas" && (

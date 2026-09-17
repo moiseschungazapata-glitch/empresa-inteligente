@@ -233,19 +233,6 @@ function Sidebar({
                 Categorías
               </button>
 
-              <button
-                className={`submenu-item ${
-                  activePage === "Clasificación"
-                    ? "active"
-                    : ""
-                }`}
-                onClick={() =>
-                  handleSelectPage("Clasificación")
-                }
-              >
-                Clasificación
-              </button>
-
             </div>
           )}
 
