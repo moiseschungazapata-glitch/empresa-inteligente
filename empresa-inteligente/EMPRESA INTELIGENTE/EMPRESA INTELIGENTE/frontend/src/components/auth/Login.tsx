@@ -2585,7 +2585,7 @@ export default function Login({
 
           <a className="landing-back-link" href="/landing">
             <span aria-hidden="true">←</span>
-            Volver a comentarios
+            Volver al landing cliente
           </a>
 
           <div className="login-form-container">
