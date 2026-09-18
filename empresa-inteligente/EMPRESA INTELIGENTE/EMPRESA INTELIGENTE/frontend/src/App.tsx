@@ -6,6 +6,7 @@ import Login from "./components/auth/Login";
 import Register from "./components/auth/register";
 
 import LandingPage from "./pages/LandingPage";
+import PasswordRecovery from "./pages/PasswordRecovery";
 import AnalizarComentario from "./pages/AnalizarComentario";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
@@ -64,6 +65,7 @@ function App() {
   const isLandingPath =
     window.location.pathname === "/landing" ||
     window.location.pathname === "/landing/";
+  const isRecoveryPath = window.location.pathname === "/recuperar-contrasena";
 
   useEffect(() => {
     // ----------------------------------------------------------
@@ -113,6 +115,10 @@ function App() {
   // ----------------------------------------------------------
   if (isLandingPath) {
     return <LandingPage />;
+  }
+
+  if (isRecoveryPath) {
+    return <PasswordRecovery />;
   }
 
   // ----------------------------------------------------------

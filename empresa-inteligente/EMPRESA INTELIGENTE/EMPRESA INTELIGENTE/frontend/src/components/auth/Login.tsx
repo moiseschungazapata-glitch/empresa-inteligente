@@ -60,6 +60,10 @@ export default function Login({
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
@@ -568,6 +572,27 @@ export default function Login({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePasswordRecovery = async (e: FormEvent) => {
+    e.preventDefault();
+    const targetEmail = recoveryEmail.trim().toLowerCase();
+    if (!targetEmail) {
+      setRecoveryStatus("Escribe el correo asociado a tu cuenta.");
+      return;
+    }
+    setRecoveryLoading(true);
+    setRecoveryStatus(null);
+    const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(
+      targetEmail,
+      { redirectTo: `${window.location.origin}/recuperar-contrasena` }
+    );
+    setRecoveryLoading(false);
+    setRecoveryStatus(
+      recoveryError
+        ? "No pudimos enviar el enlace. Verifica el correo e inténtalo nuevamente."
+        : "Te enviamos un enlace para crear una nueva contraseña. Revisa tu correo."
+    );
   };
 
   // ============================================================
@@ -2415,6 +2440,9 @@ export default function Login({
           }
         }
 
+        .recovery-overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:rgba(3,8,18,.72);backdrop-filter:blur(5px)}
+        .recovery-card{position:relative;width:min(440px,100%);padding:32px;border:1px solid #334155;border-radius:16px;background:#111827;color:#f8fafc;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+        .recovery-card h2{margin:8px 0 10px;font-size:24px}.recovery-card p{margin:0 0 22px;color:#aab8cc;line-height:1.55;font-size:14px}.recovery-card form{display:grid;gap:9px}.recovery-label{font-size:12px;font-weight:700}.recovery-card input{width:100%;padding:13px 14px;border:1px solid #3b4b63;border-radius:8px;background:#0f1724;color:#f8fafc;font-size:14px;outline:none}.recovery-card input:focus{border-color:#6685ff}.recovery-card .main-button{margin-top:8px}.recovery-close{position:absolute;top:10px;right:14px;border:0;background:transparent;color:#aab8cc;font-size:26px;cursor:pointer}.recovery-status{padding:10px 12px;border-radius:8px;background:#1e293b;color:#bcd0ff;font-size:12px;line-height:1.45}.recovery-cancel{width:100%;margin-top:15px;border:0;background:transparent;color:#aab8cc;cursor:pointer;font-size:12px}
       `}</style>
 
       <div
@@ -2763,11 +2791,11 @@ export default function Login({
                     <button
                       type="button"
                       className="forgot"
-                      onClick={() =>
-                        alert(
-                          "Contacta a administración de TI."
-                        )
-                      }
+                      onClick={() => {
+                        setRecoveryEmail(email);
+                        setRecoveryStatus(null);
+                        setShowRecovery(true);
+                      }}
                     >
                       ¿Olvidaste tu contraseña?
                     </button>
@@ -3175,6 +3203,24 @@ export default function Login({
                 </button>
 
               </>
+            )}
+
+            {showRecovery && (
+              <div className="recovery-overlay" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+                <div className="recovery-card">
+                  <button type="button" className="recovery-close" onClick={() => setShowRecovery(false)} aria-label="Cerrar">×</button>
+                  <div className="form-kicker">RECUPERACIÓN DE ACCESO</div>
+                  <h2 id="recovery-title">Restablece tu contraseña</h2>
+                  <p>Escribe el correo de tu cuenta y te enviaremos un enlace seguro para crear una nueva contraseña.</p>
+                  <form onSubmit={handlePasswordRecovery}>
+                    <label className="recovery-label" htmlFor="recovery-email">Correo electrónico</label>
+                    <input id="recovery-email" type="email" required autoComplete="email" value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} placeholder="nombre@empresa.com" />
+                    {recoveryStatus && <div className="recovery-status">{recoveryStatus}</div>}
+                    <button type="submit" className="main-button" disabled={recoveryLoading}>{recoveryLoading ? "Enviando..." : "Enviar enlace de recuperación"}</button>
+                  </form>
+                  <button type="button" className="recovery-cancel" onClick={() => setShowRecovery(false)}>Volver al inicio de sesión</button>
+                </div>
+              </div>
             )}
 
             <div className="security-line">
